@@ -1,0 +1,155 @@
+{
+  "id": null,
+  "tenantId": "12679",
+  "name": "CT — Flujo Trivia",
+  "isPro": true,
+  "channelTypes": ["WA"],
+  "flowNodes": [
+    {
+      "id": "trv-start",
+      "flowNodeType": "Message",
+      "isStartNode": true,
+      "flowNodePosition": {"posX": "80", "posY": "200"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>⚽ <strong>Crack Tesos 2026</strong></p><p>Cargando tu trivia...</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "trv-wh-obtener",
+      "flowNodeType": "Webhook",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "420", "posY": "200"},
+      "methodType": "Post",
+      "url": "https://n8n-content-creation-nodo-n8n.5szgix.easypanel.host/webhook/crack-tesos/obtener-trivia",
+      "headers": [
+        {"key": "x-wati-token", "value": "CrackTesos2026_WH_Token"},
+        {"key": "Content-Type", "value": "application/json"}
+      ],
+      "body": "{\"phone\": \"{{phone}}\"}",
+      "testVariables": [{"key": "phone", "value": "573208439238"}],
+      "responseVariables": [
+        {"variable": "tiene_trivia", "responseKey": "tiene_trivia"},
+        {"variable": "nombre", "responseKey": "nombre"},
+        {"variable": "trivia_id", "responseKey": "trivia_id"},
+        {"variable": "numero_trivia", "responseKey": "numero_trivia"},
+        {"variable": "question", "responseKey": "question"},
+        {"variable": "option_a", "responseKey": "option_a"},
+        {"variable": "option_b", "responseKey": "option_b"},
+        {"variable": "option_c", "responseKey": "option_c"},
+        {"variable": "horas_restantes", "responseKey": "horas_restantes"},
+        {"variable": "total_goles", "responseKey": "total_goles"},
+        {"variable": "mensaje_sin_trivia", "responseKey": "mensaje"}
+      ],
+      "expectedStatuses": []
+    },
+    {
+      "id": "trv-cond-tiene",
+      "flowNodeType": "Condition",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "760", "posY": "200"},
+      "flowNodeConditions": [{"id": "c1", "flowConditionType": "Equal", "variable": "tiene_trivia", "value": "true"}],
+      "conditionOperator": "None",
+      "conditionResult": {"yResultNodeId": "trv-btn-pregunta", "nResultNodeId": "trv-msg-sin-trivia"}
+    },
+    {
+      "id": "trv-msg-sin-trivia",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1100", "posY": "500"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>{{mensaje_sin_trivia}}</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "trv-btn-pregunta",
+      "flowNodeType": "InteractiveButtons",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1100", "posY": "0"},
+      "interactiveButtonsHeader": {"type": "Text", "text": "⚽ Trivia #{{numero_trivia}} — Crack Tesos", "media": null},
+      "interactiveButtonsBody": "<p>Hola <strong>{{nombre}}</strong> 👋</p><p>📌 <strong>{{question}}</strong></p><p>⏱️ Tienes <strong>{{horas_restantes}}</strong> para responder. ¡Más rápido = más Goles!</p>",
+      "interactiveButtonsFooter": "",
+      "interactiveButtonsItems": [
+        {"id": "btn-a", "buttonText": "🅰️ {{option_a}}", "nodeResultId": "trv-wh-respuesta"},
+        {"id": "btn-b", "buttonText": "🅱️ {{option_b}}", "nodeResultId": "trv-wh-respuesta"},
+        {"id": "btn-c", "buttonText": "🅲️ {{option_c}}", "nodeResultId": "trv-wh-respuesta"}
+      ],
+      "interactiveButtonsUserInputVariable": "respuesta_usuario",
+      "interactiveButtonsDefaultNodeResultId": ""
+    },
+    {
+      "id": "trv-wh-respuesta",
+      "flowNodeType": "Webhook",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1500", "posY": "0"},
+      "methodType": "Post",
+      "url": "https://n8n-content-creation-nodo-n8n.5szgix.easypanel.host/webhook/crack-tesos/respuesta-trivia",
+      "headers": [
+        {"key": "x-wati-token", "value": "CrackTesos2026_WH_Token"},
+        {"key": "Content-Type", "value": "application/json"}
+      ],
+      "body": "{\"phone\": \"{{phone}}\", \"trivia_id\": \"@trivia_id\", \"selected_option\": \"@respuesta_usuario\"}",
+      "testVariables": [
+        {"key": "phone", "value": "573208439238"},
+        {"key": "trivia_id", "value": "test-uuid-here"},
+        {"key": "respuesta_usuario", "value": "A"}
+      ],
+      "responseVariables": [
+        {"variable": "result", "responseKey": "result"},
+        {"variable": "es_correcto", "responseKey": "is_correct"},
+        {"variable": "goles_trivia", "responseKey": "total_goals_trivia"},
+        {"variable": "goles_total", "responseKey": "total_accumulated"},
+        {"variable": "mensaje_resultado", "responseKey": "mensaje"}
+      ],
+      "expectedStatuses": []
+    },
+    {
+      "id": "trv-cond-correcto",
+      "flowNodeType": "Condition",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1900", "posY": "0"},
+      "flowNodeConditions": [{"id": "c2", "flowConditionType": "Equal", "variable": "es_correcto", "value": "true"}],
+      "conditionOperator": "None",
+      "conditionResult": {"yResultNodeId": "trv-msg-correcto", "nResultNodeId": "trv-msg-incorrecto"}
+    },
+    {
+      "id": "trv-msg-correcto",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "2300", "posY": "0"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>✅ <strong>¡Correcto, {{nombre}}!</strong></p><p>⚽ Goles en esta trivia: <strong>{{goles_trivia}}</strong></p><p>🏆 Tu acumulado total: <strong>{{goles_total}} Goles</strong></p><p>¡Sigue así, crack! 💪</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "trv-msg-incorrecto",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "2300", "posY": "300"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>❌ <strong>{{nombre}}</strong>, esa no era la respuesta correcta.</p><p>Esta vez no ganas Goles, pero ¡no te rindas!</p><p>Tu acumulado sigue en <strong>{{goles_total}} Goles</strong> ⚽</p><p>Escribe <strong>MENU</strong> para ver tu ranking.</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "trv-close",
+      "flowNodeType": "UpdateChatStatus",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "2700", "posY": "150"},
+      "status": "TicketClosing"
+    }
+  ],
+  "flowEdges": [
+    {"id": "e01", "sourceNodeId": "trv-start", "targetNodeId": "trv-wh-obtener"},
+    {"id": "e02", "sourceNodeId": "trv-wh-obtener", "targetNodeId": "trv-cond-tiene"},
+    {"id": "e03", "sourceNodeId": "trv-cond-tiene__true", "targetNodeId": "trv-btn-pregunta"},
+    {"id": "e04", "sourceNodeId": "trv-cond-tiene__false", "targetNodeId": "trv-msg-sin-trivia"},
+    {"id": "e05", "sourceNodeId": "trv-btn-pregunta__btn-a", "targetNodeId": "trv-wh-respuesta"},
+    {"id": "e06", "sourceNodeId": "trv-btn-pregunta__btn-b", "targetNodeId": "trv-wh-respuesta"},
+    {"id": "e07", "sourceNodeId": "trv-btn-pregunta__btn-c", "targetNodeId": "trv-wh-respuesta"},
+    {"id": "e08", "sourceNodeId": "trv-wh-respuesta", "targetNodeId": "trv-cond-correcto"},
+    {"id": "e09", "sourceNodeId": "trv-cond-correcto__true", "targetNodeId": "trv-msg-correcto"},
+    {"id": "e10", "sourceNodeId": "trv-cond-correcto__false", "targetNodeId": "trv-msg-incorrecto"},
+    {"id": "e11", "sourceNodeId": "trv-msg-correcto", "targetNodeId": "trv-close"},
+    {"id": "e12", "sourceNodeId": "trv-msg-incorrecto", "targetNodeId": "trv-close"},
+    {"id": "e13", "sourceNodeId": "trv-msg-sin-trivia", "targetNodeId": "trv-close"}
+  ]
+}

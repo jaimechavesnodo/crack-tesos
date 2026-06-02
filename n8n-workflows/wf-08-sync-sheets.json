@@ -1,0 +1,149 @@
+{
+  "name": "CT WF-08 — Sync Google Sheets (Cron)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {"interval": [{"field": "minutes", "minutesInterval": 5}]}
+      },
+      "id": "cron",
+      "name": "Cron cada 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds, rank_agent, total_in_agent FROM v_ct_rankings WHERE status = 'active' ORDER BY rank_general ASC LIMIT 100",
+        "options": {}
+      },
+      "id": "q-ranking",
+      "name": "Query Ranking",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT r.responded_at AT TIME ZONE 'America/Bogota' as hora_bogota, u.name, u.agent_name, t.trivia_number, r.selected_option, r.is_correct, r.total_goals, r.is_duplicate, r.is_out_of_time FROM ct_trivia_responses r JOIN ct_users u ON r.user_id = u.user_id JOIN ct_trivias t ON r.trivia_id = t.trivia_id ORDER BY r.responded_at DESC LIMIT 200",
+        "options": {}
+      },
+      "id": "q-responses",
+      "name": "Query Respuestas",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 360],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(DISTINCT user_id) FILTER (WHERE registered = true) as registrados, COUNT(DISTINCT r.user_id) as activos_hoy, COUNT(*) FILTER (WHERE r.responded_at > NOW() - INTERVAL '24 hours') as respuestas_hoy, COUNT(*) FILTER (WHERE r.is_correct = true AND r.responded_at > NOW() - INTERVAL '24 hours') as correctas_hoy, COUNT(*) FILTER (WHERE r.is_correct = false AND r.responded_at > NOW() - INTERVAL '24 hours') as incorrectas_hoy FROM ct_users LEFT JOIN ct_trivia_responses r ON ct_users.user_id = r.user_id AND r.is_duplicate = false",
+        "options": {}
+      },
+      "id": "q-summary",
+      "name": "Query Resumen",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 520],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT event_type, operator_email, trivia_number, result, error_msg, created_at AT TIME ZONE 'America/Bogota' as hora_bogota FROM ct_audit_logs WHERE created_at > NOW() - INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 50",
+        "options": {}
+      },
+      "id": "q-logs",
+      "name": "Query Logs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 680],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "clearAndAppend",
+        "documentId": {"__rl": true, "mode": "id", "value": "1IZeGMIfERwS8XuGn4qdI6MWOR_26wGE1EtHnHM4362o"},
+        "sheetName": {"__rl": true, "mode": "name", "value": "Ranking"},
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "sheet-ranking",
+      "name": "Actualizar Ranking",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [700, 200],
+      "credentials": {"googleSheetsOAuth2Api": {"id": "google-sheets-creds", "name": "Google Sheets"}},
+      "notes": "Configurar 1IZeGMIfERwS8XuGn4qdI6MWOR_26wGE1EtHnHM4362o con el ID del spreadsheet de Crack Tesos"
+    },
+    {
+      "parameters": {
+        "operation": "clearAndAppend",
+        "documentId": {"__rl": true, "mode": "id", "value": "1IZeGMIfERwS8XuGn4qdI6MWOR_26wGE1EtHnHM4362o"},
+        "sheetName": {"__rl": true, "mode": "name", "value": "Respuestas Recientes"},
+        "columns": {"mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [], "schema": []},
+        "options": {}
+      },
+      "id": "sheet-responses",
+      "name": "Actualizar Respuestas",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [700, 360],
+      "credentials": {"googleSheetsOAuth2Api": {"id": "google-sheets-creds", "name": "Google Sheets"}}
+    },
+    {
+      "parameters": {
+        "operation": "clearAndAppend",
+        "documentId": {"__rl": true, "mode": "id", "value": "1IZeGMIfERwS8XuGn4qdI6MWOR_26wGE1EtHnHM4362o"},
+        "sheetName": {"__rl": true, "mode": "name", "value": "Resumen del Dia"},
+        "columns": {"mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [], "schema": []},
+        "options": {}
+      },
+      "id": "sheet-summary",
+      "name": "Actualizar Resumen",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [700, 520],
+      "credentials": {"googleSheetsOAuth2Api": {"id": "google-sheets-creds", "name": "Google Sheets"}}
+    },
+    {
+      "parameters": {
+        "operation": "clearAndAppend",
+        "documentId": {"__rl": true, "mode": "id", "value": "1IZeGMIfERwS8XuGn4qdI6MWOR_26wGE1EtHnHM4362o"},
+        "sheetName": {"__rl": true, "mode": "name", "value": "Errores y Logs"},
+        "columns": {"mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [], "schema": []},
+        "options": {}
+      },
+      "id": "sheet-logs",
+      "name": "Actualizar Logs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [700, 680],
+      "credentials": {"googleSheetsOAuth2Api": {"id": "google-sheets-creds", "name": "Google Sheets"}}
+    }
+  ],
+  "connections": {
+    "Cron cada 5 min": {
+      "main": [[
+        {"node": "Query Ranking", "type": "main", "index": 0},
+        {"node": "Query Respuestas", "type": "main", "index": 0},
+        {"node": "Query Resumen", "type": "main", "index": 0},
+        {"node": "Query Logs", "type": "main", "index": 0}
+      ]]
+    },
+    "Query Ranking": {"main": [[{"node": "Actualizar Ranking", "type": "main", "index": 0}]]},
+    "Query Respuestas": {"main": [[{"node": "Actualizar Respuestas", "type": "main", "index": 0}]]},
+    "Query Resumen": {"main": [[{"node": "Actualizar Resumen", "type": "main", "index": 0}]]},
+    "Query Logs": {"main": [[{"node": "Actualizar Logs", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}, {"name": "cron"}]
+}

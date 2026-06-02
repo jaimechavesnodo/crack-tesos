@@ -1,0 +1,70 @@
+{
+  "name": "CT WF-05 — Consulta Ranking",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/ranking",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook Ranking",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $input.first().json.headers['x-wati-token'];\nif (!token || token !== 'CrackTesos2026_WH_Token') {\n  return [{json: {ok: 'false'}}];\n}\nconst body = $input.first().json.body;\nlet phone = (body.phone || '').toString().replace(/[^0-9]/g, '');\nif (!phone.startsWith('57') && phone.length === 10) phone = '57' + phone;\nif (!phone || phone.length < 10) return [{json: {ok: 'false'}}];\nreturn [{json: {ok: 'true', phone}}];"
+      },
+      "id": "validate",
+      "name": "Validar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT v.name, v.total_goals, v.rank_general, v.rank_agent, v.agent_name, v.total_in_agent, v.total_participants, v.correct_count, v.total_responses FROM v_ct_rankings v JOIN ct_users u ON v.user_id = u.user_id WHERE u.phone = '{{ $json.phone }}' LIMIT 1",
+        "options": {}
+      },
+      "id": "query",
+      "name": "Consultar Ranking",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [680, 300],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nif (!rows.length || !rows[0].json.name) {\n  return [{json: {\n    ok: 'true', encontrado: 'false',\n    mensaje: 'No encontramos tu registro en el Crack Tesos. ¿Deseas registrarte?'\n  }}];\n}\nconst r = rows[0].json;\nconst pos = parseInt(r.rank_general || 99999);\nlet motivacional;\nif (pos === 1) motivacional = '¡Estás en el primer lugar! 🥇 ¡Eres el Crack!';\nelse if (pos <= 3) motivacional = '¡Estás en el podio! 🏆 Sigue así.';\nelse if (pos <= 10) motivacional = '¡Top 10 nacional! 🔥 Muy cerca de los líderes.';\nelse if (pos <= parseInt(r.total_participants || 999) * 0.25) motivacional = '¡Buen ritmo! Sigue respondiendo para subir. ⬆️';\nelse motivacional = '¡Cada trivia es una oportunidad de meter más goles! ⚽';\nreturn [{json: {\n  ok: 'true', encontrado: 'true',\n  nombre: r.name,\n  total_goles: String(r.total_goals || 0),\n  rank_general: String(r.rank_general),\n  total_participantes: String(r.total_participants),\n  agente: r.agent_name || 'Sin asignar',\n  rank_agente: String(r.rank_agent),\n  total_agente: String(r.total_in_agent),\n  trivias_correctas: String(r.correct_count || 0),\n  total_respondidas: String(r.total_responses || 0),\n  motivacional\n}}];"
+      },
+      "id": "build",
+      "name": "Construir Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Ranking": {"main": [[{"node": "Validar", "type": "main", "index": 0}]]},
+    "Validar": {"main": [[{"node": "Consultar Ranking", "type": "main", "index": 0}]]},
+    "Consultar Ranking": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Construir Respuesta": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}]
+}

@@ -1,0 +1,128 @@
+{
+  "name": "CT WF-09 — Multiplicadores Preview",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/multiplicadores/preview",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook Preview",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validar token JWT del módulo web\nconst token = $input.first().json.headers['x-admin-token'];\nif (!token) return [{json: {ok: 'false', error: 'No autorizado'}}];\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3 || parts[2] !== 'CrackTesos2026_Admin_Token') {\n    return [{json: {ok: 'false', error: 'Token inválido'}}];\n  }\n  const tokenAge = Date.now() - parseInt(parts[1]);\n  if (tokenAge > 8 * 3600 * 1000) return [{json: {ok: 'false', error: 'Sesión expirada. Vuelve a ingresar.'}}];\n} catch(e) {\n  return [{json: {ok: 'false', error: 'Token inválido'}}];\n}\n\nconst body = $input.first().json.body;\nconst triviaNumber = parseInt(body.trivia_number);\nconst multiplier = parseFloat(body.multiplier);\n\nif (!triviaNumber || triviaNumber < 1) return [{json: {ok: 'false', error: 'Número de trivia inválido'}}];\nif (![2, 3, 4].includes(multiplier)) return [{json: {ok: 'false', error: 'Multiplicador debe ser 2, 3 o 4'}}];\nif (!body.records || !Array.isArray(body.records) || body.records.length === 0) {\n  return [{json: {ok: 'false', error: 'No se recibieron registros del archivo'}}];\n}\n\n// Normalizar registros\nconst records = body.records.map(r => ({\n  document_id: String(r.document_id || r.cedula || '').trim(),\n  phone: String(r.phone || r.telefono || '').replace(/[^0-9]/g, ''),\n  name: String(r.name || r.nombre || '').trim()\n})).filter(r => r.document_id || r.phone);\n\nreturn [{json: {\n  ok: 'true',\n  trivia_number: triviaNumber,\n  multiplier,\n  records,\n  operator_email: body.operator_email || 'unknown',\n  source_file: body.source_file || 'upload'\n}}];"
+      },
+      "id": "validate",
+      "name": "Validar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "ok", "leftValue": "={{ $json.ok }}", "rightValue": "true", "operator": {"type": "string", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "¿Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT trivia_id, trivia_number, status FROM ct_trivias WHERE trivia_number = {{ $json.trivia_number }} LIMIT 1",
+        "options": {}
+      },
+      "id": "check-trivia",
+      "name": "Verificar Trivia",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "// Cruzar registros del archivo con la BD\nconst validated = $('Validar').first().json;\nconst triviaRow = $input.first().json;\n\nif (!triviaRow.trivia_id) {\n  return [{json: {ok: 'false', error: `Trivia #${validated.trivia_number} no encontrada`}}];\n}\n\n// Preparar query de cruce\nconst docs = validated.records.map(r => r.document_id).filter(Boolean);\nconst phones = validated.records.map(r => {\n  let p = r.phone;\n  if (p && !p.startsWith('57') && p.length === 10) p = '57' + p;\n  return p;\n}).filter(Boolean);\n\nreturn [{json: {\n  ok: 'true',\n  trivia_id: triviaRow.trivia_id,\n  trivia_number: validated.trivia_number,\n  multiplier: validated.multiplier,\n  records: validated.records,\n  docs_list: docs.map(d => `'${d}'`).join(','),\n  phones_list: phones.map(p => `'${p}'`).join(','),\n  operator_email: validated.operator_email,\n  source_file: validated.source_file\n}}];"
+      },
+      "id": "prepare-cross",
+      "name": "Preparar Cruce",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  u.user_id, u.name, u.document_id, u.phone,\n  r.response_id, r.total_goals AS goals_trivia,\n  r.multiplier_bonus,\n  (r.total_goals * ({{ $json.multiplier }} - 1)) AS goals_to_add,\n  (r.total_goals * {{ $json.multiplier }}) AS goals_final,\n  CASE WHEN r.multiplier_bonus > 0 THEN true ELSE false END AS already_applied\nFROM ct_users u\nJOIN ct_trivia_responses r ON u.user_id = r.user_id\nWHERE r.trivia_id = '{{ $json.trivia_id }}'\n  AND r.is_correct = true\n  AND r.is_duplicate = false\n  AND (\n    u.document_id IN ({{ $json.docs_list || \"'__NONE__'\" }})\n    OR u.phone IN ({{ $json.phones_list || \"'__NONE__'\" }})\n  )\nORDER BY u.name",
+        "options": {}
+      },
+      "id": "get-eligible",
+      "name": "Obtener Elegibles",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1340, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const prepData = $('Preparar Cruce').first().json;\nconst rows = $input.all();\n\nconst eligible = rows.map(r => r.json);\nconst totalRecordsFile = prepData.records.length;\nconst totalEligible = eligible.length;\nconst totalGoalsToAdd = eligible.reduce((s, r) => s + (r.goals_to_add || 0), 0);\nconst alreadyApplied = eligible.filter(r => r.already_applied).length;\n\n// Tabla de preview\nconst preview_table = eligible.map(r => ({\n  nombre: r.name,\n  cedula: r.document_id,\n  goles_actuales_trivia: r.goals_trivia,\n  goles_a_agregar: r.goals_to_add,\n  goles_nuevos_trivia: r.goals_final,\n  ya_aplicado: r.already_applied ? 'SÍ — ADVERTENCIA' : 'No'\n}));\n\nreturn [{json: {\n  ok: 'true',\n  trivia_number: prepData.trivia_number,\n  trivia_id: prepData.trivia_id,\n  multiplier: prepData.multiplier,\n  operator_email: prepData.operator_email,\n  source_file: prepData.source_file,\n  summary: {\n    total_en_archivo: totalRecordsFile,\n    total_elegibles: totalEligible,\n    total_goles_a_agregar: totalGoalsToAdd,\n    ya_con_multiplicador: alreadyApplied\n  },\n  preview_table,\n  eligible_users: eligible\n}}];"
+      },
+      "id": "build-preview",
+      "name": "Construir Preview",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1780, 250]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "={{ {ok: 'false', error: $json.error} }}"
+      },
+      "id": "respond-error",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 460]
+    }
+  ],
+  "connections": {
+    "Webhook Preview": {"main": [[{"node": "Validar", "type": "main", "index": 0}]]},
+    "Validar": {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
+    "¿Válido?": {
+      "main": [
+        [{"node": "Verificar Trivia", "type": "main", "index": 0}],
+        [{"node": "Responder Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Verificar Trivia": {"main": [[{"node": "Preparar Cruce", "type": "main", "index": 0}]]},
+    "Preparar Cruce": {"main": [[{"node": "Obtener Elegibles", "type": "main", "index": 0}]]},
+    "Obtener Elegibles": {"main": [[{"node": "Construir Preview", "type": "main", "index": 0}]]},
+    "Construir Preview": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}, {"name": "multiplicadores"}]
+}

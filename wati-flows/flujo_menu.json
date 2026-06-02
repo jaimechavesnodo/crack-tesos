@@ -1,0 +1,121 @@
+{
+  "id": null,
+  "tenantId": "12679",
+  "name": "CT — Flujo Menú Principal",
+  "isPro": true,
+  "channelTypes": ["WA"],
+  "flowNodes": [
+    {
+      "id": "menu-start",
+      "flowNodeType": "Message",
+      "isStartNode": true,
+      "flowNodePosition": {"posX": "80", "posY": "200"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>⚽ <strong>Crack Tesos 2026</strong></p><p>¿En qué te puedo ayudar?</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "menu-btn-opciones",
+      "flowNodeType": "InteractiveButtons",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "420", "posY": "200"},
+      "interactiveButtonsHeader": {"type": "Text", "text": "", "media": null},
+      "interactiveButtonsBody": "<p>Selecciona una opción:</p>",
+      "interactiveButtonsFooter": "",
+      "interactiveButtonsItems": [
+        {"id": "btn-ranking", "buttonText": "📊 Mis Goles y ranking", "nodeResultId": "menu-wh-ranking"},
+        {"id": "btn-faq", "buttonText": "❓ Cómo funciona", "nodeResultId": "menu-msg-faq1"},
+        {"id": "btn-agente", "buttonText": "💬 Hablar con un agente", "nodeResultId": "menu-msg-agente"}
+      ],
+      "interactiveButtonsUserInputVariable": "opcion_menu",
+      "interactiveButtonsDefaultNodeResultId": ""
+    },
+    {
+      "id": "menu-wh-ranking",
+      "flowNodeType": "Webhook",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "860", "posY": "0"},
+      "methodType": "Post",
+      "url": "https://n8n-content-creation-nodo-n8n.5szgix.easypanel.host/webhook/crack-tesos/ranking",
+      "headers": [
+        {"key": "x-wati-token", "value": "CrackTesos2026_WH_Token"},
+        {"key": "Content-Type", "value": "application/json"}
+      ],
+      "body": "{\"phone\": \"{{phone}}\"}",
+      "testVariables": [{"key": "phone", "value": "573208439238"}],
+      "responseVariables": [
+        {"variable": "rk_nombre", "responseKey": "nombre"},
+        {"variable": "rk_goles", "responseKey": "total_goles"},
+        {"variable": "rk_general", "responseKey": "rank_general"},
+        {"variable": "rk_total", "responseKey": "total_participantes"},
+        {"variable": "rk_agente", "responseKey": "agente"},
+        {"variable": "rk_pos_agente", "responseKey": "rank_agente"},
+        {"variable": "rk_total_agente", "responseKey": "total_agente"},
+        {"variable": "rk_correctas", "responseKey": "trivias_correctas"},
+        {"variable": "rk_motivacional", "responseKey": "motivacional"}
+      ],
+      "expectedStatuses": []
+    },
+    {
+      "id": "menu-msg-ranking",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1260", "posY": "0"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>⚽ <strong>Tu posición en el Crack Tesos</strong></p><p>👤 <strong>{{rk_nombre}}</strong></p><p>⚽ Goles acumulados: <strong>{{rk_goles}}</strong></p><p>🏆 Ranking general: <strong>{{rk_general}}°</strong> de {{rk_total}} participantes</p><p>🏅 Ranking en {{rk_agente}}: <strong>{{rk_pos_agente}}°</strong> de {{rk_total_agente}}</p><p>✅ Trivias correctas: {{rk_correctas}}</p><p>{{rk_motivacional}}</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "menu-msg-faq1",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "860", "posY": "300"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>❓ <strong>Cómo funciona el Crack Tesos 2026</strong></p><p><strong>¿Qué son los Goles?</strong><br/>Los Goles son la unidad con la que compites. Acumulas Goles respondiendo trivias correctamente.</p><p><strong>¿Cómo gano Goles?</strong><br/>• Respuesta correcta: +100 Goles base<br/>• Bono por rapidez (solo si aciertas):<br/>  0-5 min → +50 ⚽ (total 150)<br/>  5-15 min → +35 ⚽ (total 135)<br/>  15-30 min → +25 ⚽ (total 125)<br/>  30 min-6 h → +15 ⚽ (total 115)<br/>  6-24 h → +5 ⚽ (total 105)</p><p><strong>¿Cuándo son las trivias?</strong><br/>Del 11 de junio al 17 de julio. Recibirás un mensaje cuando haya una nueva trivia.</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "menu-msg-faq2",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1260", "posY": "300"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p><strong>¿Qué son los Goles adicionales?</strong><br/>Algunas trivias tienen una condición especial. Si la cumples, tus Goles de esa trivia se pueden multiplicar (x2, x3 o x4). Te informaremos cuando aplique.</p><p><strong>¿Cómo se premia?</strong><br/>Se premian los Top 3 de cada uno de los 18 distribuidores. Total: 54 ganadores.</p><p><strong>¿Cuándo termina el Crack Tesos?</strong><br/>El 17 de julio de 2026.</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "menu-msg-agente",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "860", "posY": "600"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>💬 Te conectamos con un agente. Un momento por favor...</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "menu-transfer",
+      "flowNodeType": "UpdateChatStatus",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1260", "posY": "600"},
+      "status": "Opened"
+    },
+    {
+      "id": "menu-close",
+      "flowNodeType": "UpdateChatStatus",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1700", "posY": "150"},
+      "status": "TicketClosing"
+    }
+  ],
+  "flowEdges": [
+    {"id": "e01", "sourceNodeId": "menu-start", "targetNodeId": "menu-btn-opciones"},
+    {"id": "e02", "sourceNodeId": "menu-btn-opciones__btn-ranking", "targetNodeId": "menu-wh-ranking"},
+    {"id": "e03", "sourceNodeId": "menu-btn-opciones__btn-faq", "targetNodeId": "menu-msg-faq1"},
+    {"id": "e04", "sourceNodeId": "menu-btn-opciones__btn-agente", "targetNodeId": "menu-msg-agente"},
+    {"id": "e05", "sourceNodeId": "menu-wh-ranking", "targetNodeId": "menu-msg-ranking"},
+    {"id": "e06", "sourceNodeId": "menu-msg-ranking", "targetNodeId": "menu-close"},
+    {"id": "e07", "sourceNodeId": "menu-msg-faq1", "targetNodeId": "menu-msg-faq2"},
+    {"id": "e08", "sourceNodeId": "menu-msg-faq2", "targetNodeId": "menu-close"},
+    {"id": "e09", "sourceNodeId": "menu-msg-agente", "targetNodeId": "menu-transfer"}
+  ]
+}

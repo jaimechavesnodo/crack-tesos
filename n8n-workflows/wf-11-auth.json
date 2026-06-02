@@ -1,0 +1,55 @@
+{
+  "name": "CT WF-11 — Auth Módulo Multiplicadores",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/auth/login",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook Login",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst email = (body.email || '').toLowerCase().trim();\nconst password = body.password || '';\n\n// Usuarios autorizados del módulo de multiplicadores\n// Formato: email → {password, role, nombre}\nconst USERS = {\n  'jaime.chaves@nodo.live':          {password: 'CrackAdmin2026!', role: 'admin',    nombre: 'Jaime Chaves'},\n  'daniela.corredor@nodo.live':      {password: 'CrackOp2026!',   role: 'operator', nombre: 'Daniela Corredor'},\n  'laura.uribe@dipaolalatina.com':   {password: 'CrackOp2026!',   role: 'operator', nombre: 'Laura Uribe'},\n  'camila.pulido@dipaolalatina.com': {password: 'CrackOp2026!',   role: 'operator', nombre: 'Camila Pulido'}\n};\n\nif (!email || !password) {\n  return [{json: {ok: false, error: 'Email y contraseña requeridos'}}];\n}\n\nconst user = USERS[email];\nif (!user || user.password !== password) {\n  return [{json: {ok: false, error: 'Credenciales incorrectas'}}];\n}\n\n// Token simple: base64 del email + timestamp + secret\nconst secret = 'CrackTesos2026_Admin_Token';\nconst timestamp = Date.now();\nconst tokenData = `${email}|${timestamp}|${secret}`;\nconst token = Buffer.from(tokenData).toString('base64');\n\nreturn [{json: {\n  ok: true,\n  token,\n  email,\n  nombre: user.nombre,\n  role: user.role\n}}];"
+      },
+      "id": "validate",
+      "name": "Validar Credenciales",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validar token para llamadas subsecuentes\n// Llamar como: POST /crack-tesos/auth/validate con header Authorization: Bearer [token]\nconst authHeader = $input.first().json.headers['authorization'] || '';\nconst token = authHeader.replace('Bearer ', '').trim();\n\nif (!token) return [{json: {ok: false, valid: false}}];\n\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3) return [{json: {ok: true, valid: false}}];\n  \n  const [email, timestamp, secret] = parts;\n  if (secret !== 'CrackTesos2026_Admin_Token') return [{json: {ok: true, valid: false}}];\n  \n  // Token válido por 8 horas\n  const tokenAge = Date.now() - parseInt(timestamp);\n  if (tokenAge > 8 * 3600 * 1000) return [{json: {ok: true, valid: false, error: 'Sesión expirada'}}];\n  \n  return [{json: {ok: true, valid: true, email}}];\n} catch(e) {\n  return [{json: {ok: true, valid: false}}];\n}"
+      },
+      "id": "validate-token",
+      "name": "Validar Token (reutilizable)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Validar Credenciales').first().json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Login": {"main": [[{"node": "Validar Credenciales", "type": "main", "index": 0}]]},
+    "Validar Credenciales": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}, {"name": "multiplicadores"}]
+}

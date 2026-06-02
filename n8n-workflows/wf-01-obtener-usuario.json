@@ -1,0 +1,70 @@
+{
+  "name": "CT WF-01 — Obtener Datos de Usuario",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/obtener-usuario",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $input.first().json.headers['x-wati-token'];\nif (!token || token !== 'CrackTesos2026_WH_Token') {\n  return [{json: {ok: 'false', encontrado: 'false', mensaje: 'No autorizado'}}];\n}\nconst body = $input.first().json.body;\nlet phone = (body.phone || '').toString().replace(/[^0-9]/g, '');\nif (!phone.startsWith('57') && phone.length === 10) phone = '57' + phone;\nif (!phone || phone.length < 10) {\n  return [{json: {ok: 'false', encontrado: 'false', mensaje: 'Teléfono inválido'}}];\n}\nreturn [{json: {ok: 'true', phone}}];"
+      },
+      "id": "validate",
+      "name": "Validar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT user_id, name, document_id, agent_name, registered, total_goals, status FROM ct_users WHERE phone = '{{ $json.phone }}' LIMIT 1",
+        "options": {}
+      },
+      "id": "query",
+      "name": "Consultar Usuario",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [680, 300],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const phone = $('Validar').first().json.phone;\nconst rows = $input.all();\nif (!rows.length || !rows[0].json.user_id) {\n  return [{json: {ok: 'true', encontrado: 'false', phone, mensaje: 'Usuario no encontrado en la base'}}];\n}\nconst u = rows[0].json;\nreturn [{json: {\n  ok: 'true',\n  encontrado: 'true',\n  phone,\n  user_id: u.user_id,\n  nombre: u.name || '',\n  cedula: u.document_id || 'No registrada',\n  agente: u.agent_name || '',\n  registrado: u.registered ? 'true' : 'false',\n  total_goles: String(u.total_goals || 0),\n  status: u.status\n}}];"
+      },
+      "id": "build",
+      "name": "Construir Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Validar", "type": "main", "index": 0}]]},
+    "Validar": {"main": [[{"node": "Consultar Usuario", "type": "main", "index": 0}]]},
+    "Consultar Usuario": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Construir Respuesta": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}]
+}

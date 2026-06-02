@@ -1,0 +1,103 @@
+{
+  "name": "CT WF-06 — Gestión de Trivias (Formulario)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Crack Tesos — Gestión de Trivias",
+        "formDescription": "Carga o edita una trivia. Las posiciones A/B/C se asignarán aleatoriamente. El campo Fecha/Hora de Envío es la hora exacta de Bogotá en que enviarás la difusión manual en WATI.",
+        "formFields": {
+          "values": [
+            {"fieldLabel": "Contraseña de operador", "fieldType": "password", "requiredField": true},
+            {"fieldLabel": "Acción", "fieldType": "dropdown", "requiredField": true,
+             "fieldOptions": {"values": [{"option": "Crear nueva trivia"}, {"option": "Editar trivia existente"}]}},
+            {"fieldLabel": "Número de trivia", "fieldType": "number", "requiredField": true, "placeholder": "Ej: 1"},
+            {"fieldLabel": "Pregunta", "fieldType": "textarea", "requiredField": true},
+            {"fieldLabel": "Respuesta CORRECTA", "fieldType": "text", "requiredField": true},
+            {"fieldLabel": "Respuesta incorrecta 1", "fieldType": "text", "requiredField": true},
+            {"fieldLabel": "Respuesta incorrecta 2", "fieldType": "text", "requiredField": true},
+            {
+              "fieldLabel": "Fecha y hora de envío Bogotá (AAAA-MM-DD HH:MM)",
+              "fieldType": "text", "requiredField": true,
+              "placeholder": "Ej: 2026-06-11 09:00 — Esta es la hora en que envías la difusión manual en WATI"
+            },
+            {"fieldLabel": "¿Tiene goles adicionales (multiplicador)?", "fieldType": "dropdown", "requiredField": true,
+             "fieldOptions": {"values": [{"option": "No"}, {"option": "Sí"}]}},
+            {"fieldLabel": "Estado", "fieldType": "dropdown", "requiredField": true,
+             "fieldOptions": {"values": [{"option": "draft"}, {"option": "ready"}, {"option": "sent"}, {"option": "closed"}]}}
+          ]
+        },
+        "respondWith": "text",
+        "responseText": "=✅ Trivia guardada.\n\nOpciones asignadas aleatoriamente:\nA: {{ $json.option_a }}\nB: {{ $json.option_b }}\nC: {{ $json.option_c }}\nRespuesta correcta: Opción {{ $json.correct_option }}\n\nFecha/hora envío (Bogotá): {{ $json.sent_at_bogota }}\nclosed_at (Bogotá): {{ $json.closes_at_bogota }}",
+        "options": {}
+      },
+      "id": "form",
+      "name": "Formulario Trivia",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const form = $input.first().json;\nif (form['Contraseña de operador'] !== 'CrackTesos2026_Admin') {\n  throw new Error('Contraseña incorrecta.');\n}\nconst question = form['Pregunta']?.trim();\nconst correct = form['Respuesta CORRECTA']?.trim();\nconst wrong1 = form['Respuesta incorrecta 1']?.trim();\nconst wrong2 = form['Respuesta incorrecta 2']?.trim();\nif (!question || !correct || !wrong1 || !wrong2) throw new Error('Faltan campos obligatorios.');\n\n// Validar y convertir fecha (Bogotá → UTC)\nconst rawDate = form['Fecha y hora de envío Bogotá (AAAA-MM-DD HH:MM)']?.trim();\nif (!rawDate || !/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$/.test(rawDate)) {\n  throw new Error('Formato de fecha incorrecto. Usa: AAAA-MM-DD HH:MM');\n}\n// Convertir Bogotá (UTC-5) a UTC\nconst sentAtUTC = new Date(rawDate.replace(' ', 'T') + ':00-05:00').toISOString();\nconst closesAtUTC = new Date(new Date(sentAtUTC).getTime() + 24 * 3600 * 1000).toISOString();\n\n// Mostrar en Bogotá para confirmación\nconst sentAtBogota = new Date(sentAtUTC).toLocaleString('es-CO', {timeZone: 'America/Bogota'});\nconst closesAtBogota = new Date(closesAtUTC).toLocaleString('es-CO', {timeZone: 'America/Bogota'});\n\n// Shuffle A/B/C\nconst options = [{text: correct, is_correct: true}, {text: wrong1, is_correct: false}, {text: wrong2, is_correct: false}];\nfor (let i = options.length - 1; i > 0; i--) {\n  const j = Math.floor(Math.random() * (i + 1));\n  [options[i], options[j]] = [options[j], options[i]];\n}\nconst correct_option = options[0].is_correct ? 'A' : (options[1].is_correct ? 'B' : 'C');\n\nreturn [{json: {\n  action: form['Acción'],\n  trivia_number: parseInt(form['Número de trivia']),\n  question,\n  correct_answer: correct,\n  wrong_1: wrong1,\n  wrong_2: wrong2,\n  option_a: options[0].text,\n  option_b: options[1].text,\n  option_c: options[2].text,\n  correct_option,\n  sent_at_utc: sentAtUTC,\n  closes_at_utc: closesAtUTC,\n  sent_at_bogota: sentAtBogota,\n  closes_at_bogota: closesAtBogota,\n  has_multiplier: form['¿Tiene goles adicionales (multiplicador)?'] === 'Sí' ? 'true' : 'false',\n  status: form['Estado'] || 'draft'\n}}];"
+      },
+      "id": "process",
+      "name": "Procesar y Shuffle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "a", "leftValue": "={{ $json.action }}", "rightValue": "Crear nueva trivia", "operator": {"type": "string", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-action",
+      "name": "¿Crear o Editar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ct_trivias (trivia_number, question, correct_answer, wrong_1, wrong_2, option_a, option_b, option_c, correct_option, sent_at, closes_at, has_multiplier, status, created_by)\nVALUES ({{ $json.trivia_number }}, '{{ $json.question.replace(/'/g,\"''\") }}', '{{ $json.correct_answer.replace(/'/g,\"''\") }}', '{{ $json.wrong_1.replace(/'/g,\"''\") }}', '{{ $json.wrong_2.replace(/'/g,\"''\") }}', '{{ $json.option_a.replace(/'/g,\"''\") }}', '{{ $json.option_b.replace(/'/g,\"''\") }}', '{{ $json.option_c.replace(/'/g,\"''\") }}', '{{ $json.correct_option }}', '{{ $json.sent_at_utc }}', '{{ $json.closes_at_utc }}', {{ $json.has_multiplier === 'true' }}, '{{ $json.status }}', 'formulario')\nRETURNING trivia_id, trivia_number",
+        "options": {}
+      },
+      "id": "create",
+      "name": "Crear Trivia",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ct_trivias SET question = '{{ $json.question.replace(/'/g,\"''\") }}', correct_answer = '{{ $json.correct_answer.replace(/'/g,\"''\") }}', wrong_1 = '{{ $json.wrong_1.replace(/'/g,\"''\") }}', wrong_2 = '{{ $json.wrong_2.replace(/'/g,\"''\") }}', option_a = '{{ $json.option_a.replace(/'/g,\"''\") }}', option_b = '{{ $json.option_b.replace(/'/g,\"''\") }}', option_c = '{{ $json.option_c.replace(/'/g,\"''\") }}', correct_option = '{{ $json.correct_option }}', sent_at = '{{ $json.sent_at_utc }}', closes_at = '{{ $json.closes_at_utc }}', has_multiplier = {{ $json.has_multiplier === 'true' }}, status = '{{ $json.status }}', updated_at = NOW() WHERE trivia_number = {{ $json.trivia_number }} AND NOT EXISTS (SELECT 1 FROM ct_trivia_responses WHERE trivia_id = ct_trivias.trivia_id LIMIT 1) RETURNING trivia_id, trivia_number",
+        "options": {}
+      },
+      "id": "update",
+      "name": "Editar Trivia",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 420],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    }
+  ],
+  "connections": {
+    "Formulario Trivia": {"main": [[{"node": "Procesar y Shuffle", "type": "main", "index": 0}]]},
+    "Procesar y Shuffle": {"main": [[{"node": "¿Crear o Editar?", "type": "main", "index": 0}]]},
+    "¿Crear o Editar?": {
+      "main": [
+        [{"node": "Crear Trivia", "type": "main", "index": 0}],
+        [{"node": "Editar Trivia", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}, {"name": "operador"}]
+}

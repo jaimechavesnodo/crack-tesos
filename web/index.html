@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crack Tesos — Módulo de Goles Adicionales</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+    /* Header */
+    .header { background: #1a1a2e; color: white; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header .badge { background: #e63946; color: white; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .user-info { margin-left: auto; font-size: 13px; color: #aaa; }
+
+    /* Screens */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* Login */
+    .login-container { max-width: 400px; margin: 80px auto; padding: 0 16px; }
+    .card { background: white; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    .card h2 { font-size: 22px; color: #1a1a2e; margin-bottom: 8px; }
+    .card .subtitle { color: #666; font-size: 14px; margin-bottom: 28px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; color: #444; margin-bottom: 6px; }
+    .form-group input, .form-group select { width: 100%; padding: 10px 14px; border: 1.5px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: border-color 0.2s; outline: none; }
+    .form-group input:focus, .form-group select:focus { border-color: #e63946; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-primary { background: #e63946; color: white; }
+    .btn-primary:hover { background: #c1121f; }
+    .btn-secondary { background: #f0f2f5; color: #444; margin-top: 10px; }
+    .btn-secondary:hover { background: #e0e0e0; }
+    .btn-success { background: #2d6a4f; color: white; }
+    .btn-success:hover { background: #1b4332; }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error-msg { background: #fff0f0; border: 1px solid #ffcdd2; color: #c62828; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none; }
+
+    /* Main app */
+    .app-container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+    .section-title { font-size: 13px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; margin-top: 24px; }
+    .section-title:first-child { margin-top: 0; }
+
+    /* Upload area */
+    .upload-area { border: 2px dashed #d0d0d0; border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.2s; background: white; }
+    .upload-area:hover, .upload-area.dragover { border-color: #e63946; background: #fff5f5; }
+    .upload-area .icon { font-size: 36px; margin-bottom: 10px; }
+    .upload-area p { color: #666; font-size: 14px; }
+    .upload-area strong { color: #e63946; }
+    .file-selected { background: #f0fdf4; border-color: #86efac; }
+    .file-selected p { color: #15803d; }
+
+    /* Config row */
+    .config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Preview table */
+    .preview-box { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .preview-summary { padding: 20px 24px; border-bottom: 1px solid #f0f0f0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .summary-item { text-align: center; }
+    .summary-item .value { font-size: 28px; font-weight: 700; color: #1a1a2e; }
+    .summary-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+    .summary-item.highlight .value { color: #e63946; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8f9fa; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.3px; }
+    td { padding: 12px 16px; border-top: 1px solid #f0f0f0; font-size: 14px; }
+    tr:hover td { background: #fafafa; }
+    .badge-goles { background: #fff3cd; color: #856404; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-nuevos { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-warn { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 20px; font-size: 12px; }
+    .table-scroll { max-height: 400px; overflow-y: auto; }
+
+    /* Confirm section */
+    .confirm-section { background: white; border-radius: 12px; padding: 24px; margin-top: 16px; border: 2px solid #e63946; }
+    .confirm-section h3 { color: #e63946; margin-bottom: 8px; }
+    .confirm-section p { color: #666; font-size: 14px; margin-bottom: 16px; }
+    .confirm-buttons { display: flex; gap: 12px; }
+    .confirm-buttons .btn { width: auto; padding: 12px 28px; }
+
+    /* Result */
+    .result-card { text-align: center; padding: 48px 32px; }
+    .result-card .result-icon { font-size: 64px; margin-bottom: 16px; }
+    .result-card h2 { font-size: 24px; color: #1a1a2e; margin-bottom: 8px; }
+    .result-card p { color: #666; font-size: 15px; }
+    .result-stats { display: flex; justify-content: center; gap: 32px; margin: 24px 0; }
+    .result-stat { text-align: center; }
+    .result-stat .n { font-size: 32px; font-weight: 700; color: #2d6a4f; }
+    .result-stat .l { font-size: 13px; color: #888; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 32px; color: #888; }
+    .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #f0f0f0; border-top-color: #e63946; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Steps indicator */
+    .steps { display: flex; align-items: center; gap: 0; margin-bottom: 24px; }
+    .step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #bbb; }
+    .step.active { color: #e63946; font-weight: 600; }
+    .step.done { color: #2d6a4f; }
+    .step-num { width: 24px; height: 24px; border-radius: 50%; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+    .step.active .step-num { background: #e63946; color: white; }
+    .step.done .step-num { background: #2d6a4f; color: white; }
+    .step-line { flex: 1; height: 2px; background: #e0e0e0; margin: 0 8px; }
+    .step.done + .step-line { background: #2d6a4f; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <span style="font-size:22px">⚽</span>
+  <h1>Crack Tesos 2026</h1>
+  <span class="badge">Goles Adicionales</span>
+  <div class="user-info" id="userInfo"></div>
+</div>
+
+<!-- LOGIN -->
+<div class="screen active" id="screenLogin">
+  <div class="login-container">
+    <div class="card">
+      <h2>⚽ Módulo de Goles Adicionales</h2>
+      <p class="subtitle">Ingresa con tu cuenta autorizada para cargar multiplicadores.</p>
+      <div class="form-group">
+        <label>Correo electrónico</label>
+        <input type="email" id="loginEmail" placeholder="tucorreo@ejemplo.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" onclick="doLogin()">Ingresar</button>
+      <div class="error-msg" id="loginError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- UPLOAD & CONFIG -->
+<div class="screen" id="screenUpload">
+  <div class="app-container">
+
+    <div class="steps">
+      <div class="step active" id="step1"><div class="step-num">1</div> Cargar archivo</div>
+      <div class="step-line"></div>
+      <div class="step" id="step2"><div class="step-num">2</div> Vista previa</div>
+      <div class="step-line"></div>
+      <div class="step" id="step3"><div class="step-num">3</div> Confirmar</div>
+    </div>
+
+    <div class="section-title">Archivo de participantes</div>
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+      <div class="icon">📁</div>
+      <p>Haz clic o arrastra aquí el archivo <strong>Excel (.xlsx) o CSV</strong></p>
+      <p style="font-size:12px; margin-top:6px; color:#aaa">Debe incluir: número de documento (columna principal) y teléfono (columna secundaria)</p>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(event)">
+
+    <div class="section-title" style="margin-top:20px">Configuración</div>
+    <div class="config-row">
+      <div class="form-group">
+        <label>Número de trivia</label>
+        <select id="triviaSelect">
+          <option value="">Cargando trivias...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Multiplicador a aplicar</label>
+        <select id="multiplierSelect">
+          <option value="2">x2 — Doble de goles</option>
+          <option value="3">x3 — Triple de goles</option>
+          <option value="4">x4 — Cuádruple de goles</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="btnPreview" onclick="doPreview()" style="max-width:300px" disabled>
+      Ver vista previa →
+    </button>
+    <div class="error-msg" id="uploadError"></div>
+  </div>
+</div>
+
+<!-- PREVIEW -->
+<div class="screen" id="screenPreview">
+  <div class="app-container">
+
+    <div class="steps">
+      <div class="step done" id="step1p"><div class="step-num">✓</div> Cargar archivo</div>
+      <div class="step-line"></div>
+      <div class="step active" id="step2p"><div class="step-num">2</div> Vista previa</div>
+      <div class="step-line"></div>
+      <div class="step" id="step3p"><div class="step-num">3</div> Confirmar</div>
+    </div>
+
+    <div id="previewContent"></div>
+
+    <div class="confirm-section" id="confirmSection" style="display:none">
+      <h3>⚠️ Confirmar aplicación de goles</h3>
+      <p id="confirmText"></p>
+      <p style="color:#e63946; font-weight:600; margin-bottom:16px">Esta acción no se puede revertir.</p>
+      <div class="confirm-buttons">
+        <button class="btn btn-success" onclick="doApply()">✅ Confirmar y aplicar goles</button>
+        <button class="btn btn-secondary" style="width:auto; padding:12px 28px" onclick="goBack()">← Volver</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="screen" id="screenLoading">
+  <div class="app-container">
+    <div class="card">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p id="loadingMsg">Procesando...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div class="screen" id="screenResult">
+  <div class="app-container">
+    <div class="card">
+      <div class="result-card" id="resultContent"></div>
+      <button class="btn btn-primary" onclick="resetApp()" style="max-width:300px; margin:0 auto; display:block">
+        Cargar otro archivo
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const N8N_BASE = 'https://n8n-content-creation-nodo-n8n.5szgix.easypanel.host/webhook';
+const API = {
+  login:   `${N8N_BASE}/crack-tesos/auth/login`,
+  trivias: `${N8N_BASE}/crack-tesos/auth/trivias-activas`,  // nuevo endpoint
+  preview: `${N8N_BASE}/crack-tesos/multiplicadores/preview`,
+  apply:   `${N8N_BASE}/crack-tesos/multiplicadores/aplicar`
+};
+
+// ========== STATE ==========
+let state = {
+  token: null,
+  email: null,
+  nombre: null,
+  fileData: null,
+  fileName: null,
+  previewData: null
+};
+
+// ========== UTILS ==========
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showError(elId, msg) {
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 6000);
+}
+
+function setLoading(msg) {
+  document.getElementById('loadingMsg').textContent = msg;
+  showScreen('screenLoading');
+}
+
+// ========== LOGIN ==========
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) { showError('loginError', 'Ingresa tu correo y contraseña.'); return; }
+
+  try {
+    const res = await fetch(API.login, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if (!data.ok) { showError('loginError', data.error || 'Credenciales incorrectas.'); return; }
+
+    state.token = data.token;
+    state.email = data.email;
+    state.nombre = data.nombre;
+    document.getElementById('userInfo').textContent = `👤 ${data.nombre}`;
+
+    await loadTrivias();
+    showScreen('screenUpload');
+  } catch(e) {
+    showError('loginError', 'Error de conexión. Intenta de nuevo.');
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('screenLogin').classList.contains('active')) doLogin();
+});
+
+// ========== LOAD TRIVIAS ==========
+async function loadTrivias() {
+  try {
+    const res = await fetch(`${N8N_BASE}/crack-tesos/trivias-con-multiplicador`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'x-admin-token': state.token},
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    const select = document.getElementById('triviaSelect');
+    select.innerHTML = '<option value="">Selecciona una trivia...</option>';
+    if (data.trivias && data.trivias.length > 0) {
+      data.trivias.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.trivia_id;
+        opt.dataset.number = t.trivia_number;
+        opt.textContent = `Trivia #${t.trivia_number} — ${t.question.substring(0, 50)}${t.question.length > 50 ? '...' : ''}`;
+        select.appendChild(opt);
+      });
+    } else {
+      select.innerHTML = '<option value="">No hay trivias con multiplicador habilitado</option>';
+    }
+  } catch(e) {
+    document.getElementById('triviaSelect').innerHTML = '<option value="">Error al cargar trivias</option>';
+  }
+}
+
+// ========== FILE UPLOAD ==========
+function handleDragOver(e) { e.preventDefault(); document.getElementById('uploadArea').classList.add('dragover'); }
+function handleDragLeave(e) { document.getElementById('uploadArea').classList.remove('dragover'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+}
+function handleFile(e) { const file = e.target.files[0]; if (file) processFile(file); }
+
+function processFile(file) {
+  state.fileName = file.name;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type: 'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {defval: ''});
+
+      if (raw.length === 0) { showError('uploadError', 'El archivo está vacío.'); return; }
+
+      // Detectar columnas de documento y teléfono
+      const headers = Object.keys(raw[0]).map(h => h.toLowerCase());
+      const docCol = Object.keys(raw[0]).find(h => /document|cedula|cédula|doc|identificacion|nro/i.test(h));
+      const phoneCol = Object.keys(raw[0]).find(h => /phone|telefono|teléfono|celular|movil|móvil/i.test(h));
+      const nameCol = Object.keys(raw[0]).find(h => /nombre|name/i.test(h));
+
+      state.fileData = raw.map(row => ({
+        document_id: docCol ? String(row[docCol] || '').replace('.0','').trim() : '',
+        phone: phoneCol ? String(row[phoneCol] || '').replace('.0','').trim() : '',
+        name: nameCol ? String(row[nameCol] || '').trim() : ''
+      })).filter(r => r.document_id || r.phone);
+
+      const area = document.getElementById('uploadArea');
+      area.classList.add('file-selected');
+      area.innerHTML = `<div class="icon">✅</div><p><strong>${file.name}</strong></p><p>${state.fileData.length} registros detectados</p>`;
+
+      document.getElementById('btnPreview').disabled = false;
+    } catch(err) {
+      showError('uploadError', 'Error leyendo el archivo. Verifica que sea Excel o CSV válido.');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ========== PREVIEW ==========
+async function doPreview() {
+  if (!state.fileData || state.fileData.length === 0) { showError('uploadError', 'Primero carga un archivo.'); return; }
+  const triviaSelect = document.getElementById('triviaSelect');
+  const triviaId = triviaSelect.value;
+  const triviaNumber = triviaSelect.options[triviaSelect.selectedIndex]?.dataset.number;
+  const multiplier = parseFloat(document.getElementById('multiplierSelect').value);
+
+  if (!triviaId) { showError('uploadError', 'Selecciona una trivia.'); return; }
+
+  setLoading('Consultando base de datos y generando vista previa...');
+
+  try {
+    const res = await fetch(API.preview, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'x-admin-token': state.token},
+      body: JSON.stringify({
+        trivia_id: triviaId,
+        trivia_number: parseInt(triviaNumber),
+        multiplier,
+        records: state.fileData,
+        operator_email: state.email,
+        source_file: state.fileName
+      })
+    });
+    const data = await res.json();
+
+    if (!data.ok || data.ok === 'false') { showScreen('screenUpload'); showError('uploadError', data.error || 'Error al generar vista previa.'); return; }
+
+    state.previewData = data;
+    renderPreview(data);
+    showScreen('screenPreview');
+  } catch(e) {
+    showScreen('screenUpload');
+    showError('uploadError', 'Error de conexión con el servidor.');
+  }
+}
+
+function renderPreview(data) {
+  const s = data.summary;
+  const table = data.preview_table || [];
+
+  let warnHtml = '';
+  if (s.ya_con_multiplicador > 0) {
+    warnHtml = `<div style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:13px; color:#856404;">
+      ⚠️ <strong>${s.ya_con_multiplicador} participante(s)</strong> ya tienen multiplicador aplicado para esta trivia y serán omitidos.
+    </div>`;
+  }
+
+  const tableRows = table.map(r => `
+    <tr>
+      <td>${r.nombre}</td>
+      <td>${r.cedula}</td>
+      <td><span class="badge-goles">${r.goles_actuales_trivia} ⚽</span></td>
+      <td><span class="badge-nuevos">+${r.goles_a_agregar} → ${r.goles_nuevos_trivia} ⚽</span></td>
+      <td>${r.ya_aplicado !== 'No' ? `<span class="badge-warn">${r.ya_aplicado}</span>` : '✅'}</td>
+    </tr>`).join('');
+
+  document.getElementById('previewContent').innerHTML = `
+    ${warnHtml}
+    <div class="preview-box">
+      <div class="preview-summary">
+        <div class="summary-item">
+          <div class="value">${s.total_en_archivo}</div>
+          <div class="label">Registros en archivo</div>
+        </div>
+        <div class="summary-item highlight">
+          <div class="value">${s.total_elegibles}</div>
+          <div class="label">Participantes elegibles</div>
+        </div>
+        <div class="summary-item highlight">
+          <div class="value">+${s.total_goles_a_agregar}</div>
+          <div class="label">Goles totales a agregar</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Nombre</th><th>Cédula</th><th>Goles actuales</th><th>Después del multiplicador</th><th>Estado</th>
+          </tr></thead>
+          <tbody>${tableRows.length > 0 ? tableRows : '<tr><td colspan="5" style="text-align:center; color:#888; padding:24px;">Ningún participante del archivo respondió correctamente esta trivia.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // Mostrar sección de confirmación
+  const confirmSection = document.getElementById('confirmSection');
+  if (s.total_elegibles > 0) {
+    const t = data.trivia_number || '';
+    document.getElementById('confirmText').textContent =
+      `Se aplicará el multiplicador x${data.multiplier} a ${s.total_elegibles} participante(s) de la Trivia #${t}. Se agregarán ${s.total_goles_a_agregar} Goles en total.`;
+    confirmSection.style.display = 'block';
+  } else {
+    confirmSection.style.display = 'none';
+  }
+}
+
+// ========== APPLY ==========
+async function doApply() {
+  if (!state.previewData) return;
+  setLoading('Aplicando goles adicionales...');
+
+  try {
+    const res = await fetch(API.apply, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'x-admin-token': state.token},
+      body: JSON.stringify({
+        trivia_id: state.previewData.trivia_id,
+        trivia_number: state.previewData.trivia_number,
+        multiplier: state.previewData.multiplier,
+        eligible_users: state.previewData.eligible_users,
+        operator_email: state.email,
+        source_file: state.fileName
+      })
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      showScreen('screenPreview');
+      alert('Error al aplicar: ' + (data.error || 'Error desconocido'));
+      return;
+    }
+
+    document.getElementById('resultContent').innerHTML = `
+      <div class="result-icon">🏆</div>
+      <h2>¡Goles aplicados exitosamente!</h2>
+      <p>Trivia #${data.trivia_number} — Multiplicador x${data.multiplier}</p>
+      <div class="result-stats">
+        <div class="result-stat"><div class="n">${data.users_count}</div><div class="l">Participantes actualizados</div></div>
+        <div class="result-stat"><div class="n">+${data.total_goals_added}</div><div class="l">Goles adicionales agregados</div></div>
+      </div>
+      <p style="font-size:12px; color:#aaa; margin-top:8px">Batch ID: ${data.batch_id}</p>`;
+    showScreen('screenResult');
+  } catch(e) {
+    showScreen('screenPreview');
+    alert('Error de conexión. Intenta de nuevo.');
+  }
+}
+
+// ========== NAVIGATION ==========
+function goBack() { showScreen('screenUpload'); }
+function resetApp() {
+  state.fileData = null;
+  state.fileName = null;
+  state.previewData = null;
+  const area = document.getElementById('uploadArea');
+  area.classList.remove('file-selected');
+  area.innerHTML = `<div class="icon">📁</div><p>Haz clic o arrastra aquí el archivo <strong>Excel (.xlsx) o CSV</strong></p><p style="font-size:12px; margin-top:6px; color:#aaa">Debe incluir: número de documento (columna principal) y teléfono (columna secundaria)</p>`;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('btnPreview').disabled = true;
+  showScreen('screenUpload');
+}
+</script>
+</body>
+</html>

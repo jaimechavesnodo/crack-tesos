@@ -1,0 +1,103 @@
+{
+  "name": "CT WF-02 — Registro de Usuario",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/registro",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook Registro",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $input.first().json.headers['x-wati-token'];\nif (!token || token !== 'CrackTesos2026_WH_Token') {\n  return [{json: {ok: 'false', mensaje: 'No autorizado'}}];\n}\nconst body = $input.first().json.body;\nlet phone = (body.phone || '').toString().replace(/[^0-9]/g, '');\nif (!phone.startsWith('57') && phone.length === 10) phone = '57' + phone;\nif (!phone || phone.length < 10) {\n  return [{json: {ok: 'false', mensaje: 'Teléfono inválido'}}];\n}\nconst name = (body.name || '').trim();\nif (!name) {\n  return [{json: {ok: 'false', mensaje: 'Nombre requerido'}}];\n}\nconst termsAccepted = body.terms_accepted === true || body.terms_accepted === 'true';\nreturn [{json: {\n  ok: 'true',\n  phone,\n  name,\n  document_id: body.document_id || null,\n  terms_accepted: termsAccepted ? 'true' : 'false'\n}}];"
+      },
+      "id": "validate",
+      "name": "Validar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "ok", "leftValue": "={{ $json.ok }}", "rightValue": "true", "operator": {"type": "string", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "¿Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ct_users (phone, name, document_id, registered, terms_at, source)\nVALUES (\n  '{{ $json.phone }}',\n  '{{ $json.name }}',\n  NULLIF('{{ $json.document_id }}', 'null'),\n  '{{ $json.terms_accepted }}' = 'true',\n  CASE WHEN '{{ $json.terms_accepted }}' = 'true' THEN NOW() ELSE NULL END,\n  'whatsapp'\n)\nON CONFLICT (phone) DO UPDATE SET\n  name = CASE WHEN '{{ $json.name }}' <> '' THEN '{{ $json.name }}' ELSE ct_users.name END,\n  document_id = CASE WHEN NULLIF('{{ $json.document_id }}', 'null') IS NOT NULL\n    THEN NULLIF('{{ $json.document_id }}', 'null') ELSE ct_users.document_id END,\n  registered = CASE WHEN '{{ $json.terms_accepted }}' = 'true' THEN true ELSE ct_users.registered END,\n  terms_at = CASE WHEN '{{ $json.terms_accepted }}' = 'true' AND ct_users.registered = false THEN NOW() ELSE ct_users.terms_at END,\n  updated_at = NOW()\nRETURNING user_id, name, registered, total_goals",
+        "options": {}
+      },
+      "id": "upsert",
+      "name": "Guardar Usuario",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const validated = $('Validar').first().json;\nconst row = $input.first().json;\nreturn [{json: {\n  ok: 'true',\n  status: 'ok',\n  action: 'registered',\n  name: row.name || validated.name,\n  total_goles: String(row.total_goals || 0),\n  mensaje: `¡Listo! Registro completado.`\n}}];"
+      },
+      "id": "build-ok",
+      "name": "Respuesta OK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 250]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "={{ {ok: 'false', status: 'error', mensaje: $json.mensaje} }}"
+      },
+      "id": "respond-error",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 420]
+    }
+  ],
+  "connections": {
+    "Webhook Registro": {"main": [[{"node": "Validar", "type": "main", "index": 0}]]},
+    "Validar": {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
+    "¿Válido?": {
+      "main": [
+        [{"node": "Guardar Usuario", "type": "main", "index": 0}],
+        [{"node": "Responder Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Guardar Usuario": {"main": [[{"node": "Respuesta OK", "type": "main", "index": 0}]]},
+    "Respuesta OK": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}]
+}

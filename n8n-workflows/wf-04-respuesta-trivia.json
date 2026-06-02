@@ -1,0 +1,165 @@
+{
+  "name": "CT WF-04 — Respuesta Trivia + Scoring",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/respuesta-trivia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook Respuesta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $input.first().json.headers['x-wati-token'];\nif (!token || token !== 'CrackTesos2026_WH_Token') {\n  return [{json: {ok: 'false', result: 'error', mensaje: 'No autorizado'}}];\n}\nconst body = $input.first().json.body;\nlet phone = (body.phone || '').toString().replace(/[^0-9]/g, '');\nif (!phone.startsWith('57') && phone.length === 10) phone = '57' + phone;\nif (!phone || phone.length < 10) return [{json: {ok: 'false', result: 'error', mensaje: 'Teléfono inválido'}}];\nif (!body.trivia_id) return [{json: {ok: 'false', result: 'error', mensaje: 'trivia_id requerido'}}];\n// Aceptar tanto 'A'/'B'/'C' como el texto de la opción (WATI puede enviar cualquiera)\n// La resolución A/B/C se hace en 'Calcular Scoring' comparando contra option_a/b/c de la BD\nconst rawOption = (body.selected_option || '').toString().trim();\nif (!rawOption) return [{json: {ok: 'false', result: 'error', mensaje: 'Opción vacía'}}];\nreturn [{json: {ok: 'true', phone, trivia_id: body.trivia_id, selected_option: rawOption}}];"
+      },
+      "id": "validate",
+      "name": "Validar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "ok", "leftValue": "={{ $json.ok }}", "rightValue": "true", "operator": {"type": "string", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "¿Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  u.user_id, u.name, u.total_goals,\n  t.trivia_id, t.trivia_number, t.correct_option,\n  t.sent_at, t.closes_at, t.status as trivia_status,\n  (SELECT response_id FROM ct_trivia_responses\n   WHERE trivia_id = t.trivia_id AND user_id = u.user_id LIMIT 1) AS existing_response\nFROM ct_users u, ct_trivias t\nWHERE u.phone = '{{ $json.phone }}'\n  AND t.trivia_id = '{{ $json.trivia_id }}'",
+        "options": {}
+      },
+      "id": "fetch-context",
+      "name": "Obtener Contexto",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('Validar').first().json;\nconst ctx = $input.first().json;\n\n// Verificaciones\nif (!ctx.user_id) return [{json: {ok: 'true', result: 'error', mensaje: 'No estás registrado en el Crack Tesos. Por favor regístrate primero.'}}];\nif (!ctx.trivia_id) return [{json: {ok: 'true', result: 'error', mensaje: 'Trivia no encontrada.'}}];\nif (ctx.existing_response) return [{json: {ok: 'true', result: 'duplicate', nombre: ctx.name, numero_trivia: String(ctx.trivia_number), mensaje: `Ya respondiste la Trivia #${ctx.trivia_number}. Solo cuenta tu primera respuesta. 😊`}}];\n\n// Verificar ventana de tiempo\nconst now = new Date();\nconst closesAt = new Date(ctx.closes_at);\nif (now > closesAt) {\n  return [{json: {ok: 'true', result: 'out_of_time', nombre: ctx.name, numero_trivia: String(ctx.trivia_number), mensaje: `⏰ La Trivia #${ctx.trivia_number} ya cerró. ¡Espera la próxima trivia!`}}];\n}\n\n// Calcular tiempo transcurrido\nconst sentAt = new Date(ctx.sent_at);\nconst elapsedSeconds = Math.floor((now - sentAt) / 1000);\nconst elapsedMinutes = elapsedSeconds / 60;\n\n// Resolver opción seleccionada — WATI puede enviar 'A'/'B'/'C' o el texto de la opción\nlet resolvedOption = input.selected_option.toUpperCase();\nif (!['A','B','C'].includes(resolvedOption)) {\n  // WATI envió el texto — comparar contra las opciones de la BD\n  if (input.selected_option === ctx.option_a) resolvedOption = 'A';\n  else if (input.selected_option === ctx.option_b) resolvedOption = 'B';\n  else if (input.selected_option === ctx.option_c) resolvedOption = 'C';\n  else {\n    return [{json: {ok: 'true', result: 'error', nombre: ctx.name, mensaje: 'No pudimos identificar tu respuesta. Intenta de nuevo.'}}];\n  }\n}\n\n// Verificar respuesta\nconst isCorrect = resolvedOption === ctx.correct_option;\n\nlet baseGoals = 0, speedBonus = 0, speedRange = 0;\n\nif (isCorrect) {\n  baseGoals = 100;\n  if (elapsedMinutes <= 5)        { speedBonus = 50; speedRange = 1; }\n  else if (elapsedMinutes <= 15)  { speedBonus = 35; speedRange = 2; }\n  else if (elapsedMinutes <= 30)  { speedBonus = 25; speedRange = 3; }\n  else if (elapsedMinutes <= 360) { speedBonus = 15; speedRange = 4; }\n  else if (elapsedMinutes <= 1440){ speedBonus = 5;  speedRange = 5; }\n}\n\nconst totalGoals = baseGoals + speedBonus;\nconst newTotal = (ctx.total_goals || 0) + totalGoals;\n\n// Mensaje de respuesta\nlet mensaje;\nif (isCorrect) {\n  const bonusText = speedBonus > 0 ? ` + ${speedBonus} goles de bono por rapidez` : '';\n  mensaje = `⚽ ¡Correcto! Ganaste ${baseGoals} goles base${bonusText}. Total en esta trivia: ${totalGoals} goles. Llevas ${newTotal} goles acumulados.`;\n} else {\n  mensaje = `❌ Respuesta incorrecta. Esta vez no ganas goles. Llevas ${ctx.total_goals || 0} goles acumulados. ¡Sigue participando!`;\n}\n\nreturn [{json: {\n  ok: 'true',\n  result: isCorrect ? 'correct' : 'incorrect',\n  user_id: ctx.user_id,\n  nombre: ctx.name,\n  phone: input.phone,\n  trivia_id: ctx.trivia_id,\n  numero_trivia: String(ctx.trivia_number),\n  correct_option: ctx.correct_option,\n  selected_option: input.selected_option,\n  is_correct: isCorrect ? 'true' : 'false',\n  elapsed_seconds: String(elapsedSeconds),\n  speed_range: String(speedRange),\n  base_goals: String(baseGoals),\n  speed_bonus: String(speedBonus),\n  total_goals_trivia: String(totalGoals),\n  total_accumulated: String(newTotal),\n  current_total: String(ctx.total_goals || 0),\n  mensaje\n}}];"
+      },
+      "id": "calculate",
+      "name": "Calcular Scoring",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "r", "leftValue": "={{ $json.result }}", "rightValue": "error", "operator": {"type": "string", "operation": "notEquals"}}, {"id": "d", "leftValue": "={{ $json.result }}", "rightValue": "duplicate", "operator": {"type": "string", "operation": "notEquals"}}, {"id": "o", "leftValue": "={{ $json.result }}", "rightValue": "out_of_time", "operator": {"type": "string", "operation": "notEquals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-save",
+      "name": "¿Guardar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ins AS (\n  INSERT INTO ct_trivia_responses\n    (trivia_id, user_id, phone, selected_option, is_correct, responded_at,\n     response_seconds, speed_range, base_goals, speed_bonus, total_goals, final_goals)\n  VALUES (\n    '{{ $json.trivia_id }}', '{{ $json.user_id }}', '{{ $json.phone }}',\n    '{{ $json.selected_option }}', {{ $json.is_correct === 'true' }},\n    NOW() AT TIME ZONE 'America/Bogota',\n    {{ $json.elapsed_seconds }}, {{ $json.speed_range }},\n    {{ $json.base_goals }}, {{ $json.speed_bonus }},\n    {{ $json.total_goals_trivia }}, {{ $json.total_goals_trivia }}\n  )\n  ON CONFLICT (trivia_id, user_id) DO NOTHING\n  RETURNING response_id\n)\nSELECT response_id FROM ins",
+        "options": {}
+      },
+      "id": "save-response",
+      "name": "Guardar Respuesta",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1560, 120],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ct_scoring_ledger (user_id, trivia_id, trivia_number, movement_type, amount, description, reference_id, created_by)\nSELECT '{{ $('Calcular Scoring').first().json.user_id }}', '{{ $('Calcular Scoring').first().json.trivia_id }}', {{ $('Calcular Scoring').first().json.numero_trivia }}, 'trivia_base', {{ $('Calcular Scoring').first().json.base_goals }}, 'Trivia #{{ $('Calcular Scoring').first().json.numero_trivia }} base', '{{ $json.response_id }}', 'system'\nWHERE {{ $('Calcular Scoring').first().json.base_goals }} > 0;\nINSERT INTO ct_scoring_ledger (user_id, trivia_id, trivia_number, movement_type, amount, description, reference_id, created_by)\nSELECT '{{ $('Calcular Scoring').first().json.user_id }}', '{{ $('Calcular Scoring').first().json.trivia_id }}', {{ $('Calcular Scoring').first().json.numero_trivia }}, 'speed_bonus', {{ $('Calcular Scoring').first().json.speed_bonus }}, 'Bono rapidez Trivia #{{ $('Calcular Scoring').first().json.numero_trivia }} rango {{ $('Calcular Scoring').first().json.speed_range }}', '{{ $json.response_id }}', 'system'\nWHERE {{ $('Calcular Scoring').first().json.speed_bonus }} > 0;",
+        "options": {}
+      },
+      "id": "save-ledger",
+      "name": "Guardar Ledger",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1780, 120],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ct_users SET total_goals = total_goals + {{ $('Calcular Scoring').first().json.total_goals_trivia }}, updated_at = NOW() WHERE user_id = '{{ $('Calcular Scoring').first().json.user_id }}'",
+        "options": {}
+      },
+      "id": "update-total",
+      "name": "Actualizar Total",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2000, 120],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Calcular Scoring').first().json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2220, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {ok: 'false', result: 'error', mensaje: $('Validar').first().json.mensaje} }}"
+      },
+      "id": "respond-error",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 460]
+    }
+  ],
+  "connections": {
+    "Webhook Respuesta": {"main": [[{"node": "Validar", "type": "main", "index": 0}]]},
+    "Validar": {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
+    "¿Válido?": {
+      "main": [
+        [{"node": "Obtener Contexto", "type": "main", "index": 0}],
+        [{"node": "Responder Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Obtener Contexto": {"main": [[{"node": "Calcular Scoring", "type": "main", "index": 0}]]},
+    "Calcular Scoring": {"main": [[{"node": "¿Guardar?", "type": "main", "index": 0}]]},
+    "¿Guardar?": {
+      "main": [
+        [{"node": "Guardar Respuesta", "type": "main", "index": 0}],
+        [{"node": "Responder", "type": "main", "index": 0}]
+      ]
+    },
+    "Guardar Respuesta": {"main": [[{"node": "Guardar Ledger", "type": "main", "index": 0}]]},
+    "Guardar Ledger": {"main": [[{"node": "Actualizar Total", "type": "main", "index": 0}]]},
+    "Actualizar Total": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}]
+}

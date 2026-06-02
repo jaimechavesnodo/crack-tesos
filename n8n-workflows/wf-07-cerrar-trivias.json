@@ -1,0 +1,60 @@
+{
+  "name": "CT WF-07 — Cerrar Trivias Vencidas (Cron)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {"interval": [{"field": "minutes", "minutesInterval": 5}]}
+      },
+      "id": "cron",
+      "name": "Cron cada 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ct_trivias SET status = 'closed', updated_at = NOW() WHERE status = 'sent' AND closes_at <= NOW() RETURNING trivia_id, trivia_number, closes_at",
+        "options": {}
+      },
+      "id": "close",
+      "name": "Cerrar Trivias",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [460, 300],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{"leftValue": "={{ $input.all().length }}", "rightValue": 0, "operator": {"type": "number", "operation": "gt"}}]
+        }
+      },
+      "id": "if-closed",
+      "name": "¿Se cerró alguna?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ct_audit_logs (event_type, operator_email, trivia_number, payload, result) VALUES ('trivia_closed', 'system', {{ $input.all()[0]?.json?.trivia_number || 0 }}, '{{ JSON.stringify($input.all().map(i => ({trivia_number: i.json.trivia_number, closed_at: i.json.closes_at}))) }}'::jsonb, 'success')",
+        "options": {}
+      },
+      "id": "log",
+      "name": "Log Cierre",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    }
+  ],
+  "connections": {
+    "Cron cada 5 min": {"main": [[{"node": "Cerrar Trivias", "type": "main", "index": 0}]]},
+    "Cerrar Trivias": {"main": [[{"node": "¿Se cerró alguna?", "type": "main", "index": 0}]]},
+    "¿Se cerró alguna?": {"main": [[{"node": "Log Cierre", "type": "main", "index": 0}], []]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}, {"name": "cron"}]
+}

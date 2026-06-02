@@ -1,0 +1,92 @@
+{
+  "name": "CT WF-12 — Trivias con Multiplicador (para módulo web)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/trivias-con-multiplicador",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validar token del módulo\nconst token = $input.first().json.headers['x-admin-token'];\nif (!token) return [{json: {ok: false, error: 'No autorizado'}}];\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3 || parts[2] !== 'CrackTesos2026_Admin_Token') {\n    return [{json: {ok: false, error: 'Token inválido'}}];\n  }\n  const tokenAge = Date.now() - parseInt(parts[1]);\n  if (tokenAge > 8 * 3600 * 1000) return [{json: {ok: false, error: 'Sesión expirada'}}];\n  return [{json: {ok: true}}];\n} catch(e) {\n  return [{json: {ok: false, error: 'Token inválido'}}];\n}"
+      },
+      "id": "validate-token",
+      "name": "Validar Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "ok", "leftValue": "={{ $json.ok }}", "rightValue": "true", "operator": {"type": "string", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "¿Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT trivia_id, trivia_number, question, status, sent_at AT TIME ZONE 'America/Bogota' as sent_at_bogota FROM ct_trivias WHERE has_multiplier = true ORDER BY trivia_number ASC",
+        "options": {}
+      },
+      "id": "query",
+      "name": "Obtener Trivias",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {ok: true, trivias: $input.all().map(i => i.json)} }}"
+      },
+      "id": "respond-ok",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={{ {ok: false, error: $('Validar Token').first().json.error} }}"
+      },
+      "id": "respond-error",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 420]
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Validar Token", "type": "main", "index": 0}]]},
+    "Validar Token": {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
+    "¿Válido?": {
+      "main": [
+        [{"node": "Obtener Trivias", "type": "main", "index": 0}],
+        [{"node": "Responder Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Obtener Trivias": {"main": [[{"node": "Responder OK", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}, {"name": "multiplicadores"}]
+}

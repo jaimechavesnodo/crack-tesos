@@ -1,0 +1,22 @@
+# Sistema
+.DS_Store
+*.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Archivos temporales
+*.tmp
+*.bak
+*.log
+
+# Python
+__pycache__/
+*.pyc

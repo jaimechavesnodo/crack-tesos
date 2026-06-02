@@ -1,0 +1,70 @@
+{
+  "name": "CT WF-03 — Obtener Trivia Activa",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/obtener-trivia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $input.first().json.headers['x-wati-token'];\nif (!token || token !== 'CrackTesos2026_WH_Token') {\n  return [{json: {ok: 'false', tiene_trivia: 'false'}}];\n}\nconst body = $input.first().json.body;\nlet phone = (body.phone || '').toString().replace(/[^0-9]/g, '');\nif (!phone.startsWith('57') && phone.length === 10) phone = '57' + phone;\nif (!phone || phone.length < 10) {\n  return [{json: {ok: 'false', tiene_trivia: 'false', mensaje: 'Teléfono inválido'}}];\n}\nreturn [{json: {ok: 'true', phone}}];"
+      },
+      "id": "validate",
+      "name": "Validar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  u.user_id, u.name, u.registered, u.total_goals,\n  t.trivia_id, t.trivia_number, t.question,\n  t.option_a, t.option_b, t.option_c,\n  t.sent_at, t.closes_at,\n  t.has_multiplier,\n  EXTRACT(EPOCH FROM (t.closes_at - NOW())) AS seconds_remaining,\n  (SELECT COUNT(*) FROM ct_trivia_responses r\n   WHERE r.trivia_id = t.trivia_id AND r.user_id = u.user_id) AS ya_respondio\nFROM ct_users u, ct_trivias t\nWHERE u.phone = '{{ $json.phone }}'\n  AND t.status = 'sent'\n  AND t.sent_at <= NOW()\n  AND t.closes_at > NOW()\nORDER BY t.trivia_number ASC\nLIMIT 1",
+        "options": {}
+      },
+      "id": "query",
+      "name": "Buscar Trivia",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [680, 300],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const phone = $('Validar').first().json.phone;\nconst rows = $input.all();\n\nif (!rows.length || !rows[0].json.user_id) {\n  return [{json: {ok: 'true', tiene_trivia: 'false', mensaje: 'Usuario no registrado en la base.'}}];\n}\n\nconst d = rows[0].json;\n\nif (!d.trivia_id) {\n  return [{json: {ok: 'true', tiene_trivia: 'false', nombre: d.name, mensaje: '¡No hay trivia activa en este momento! Cuando enviemos la próxima, te llegará la invitación. 🏆'}}];\n}\n\nif (parseInt(d.ya_respondio) > 0) {\n  return [{json: {\n    ok: 'true', tiene_trivia: 'false',\n    nombre: d.name,\n    numero_trivia: String(d.trivia_number),\n    mensaje: `Ya respondiste la Trivia #${d.trivia_number}. ¡Espera la próxima! 💪`\n  }}];\n}\n\nconst secsRemaining = Math.max(0, Math.floor(parseFloat(d.seconds_remaining || 0)));\nconst hoursRemaining = Math.floor(secsRemaining / 3600);\nconst minsRemaining = Math.floor((secsRemaining % 3600) / 60);\nconst timeLabel = hoursRemaining > 0 ? `${hoursRemaining}h ${minsRemaining}m` : `${minsRemaining} minutos`;\n\nreturn [{json: {\n  ok: 'true',\n  tiene_trivia: 'true',\n  nombre: d.name,\n  trivia_id: d.trivia_id,\n  numero_trivia: String(d.trivia_number),\n  question: d.question,\n  option_a: d.option_a,\n  option_b: d.option_b,\n  option_c: d.option_c,\n  tiene_multiplicador: d.has_multiplier ? 'true' : 'false',\n  horas_restantes: timeLabel,\n  total_goles: String(d.total_goals || 0)\n}}];"
+      },
+      "id": "build",
+      "name": "Construir Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {"main": [[{"node": "Validar", "type": "main", "index": 0}]]},
+    "Validar": {"main": [[{"node": "Buscar Trivia", "type": "main", "index": 0}]]},
+    "Buscar Trivia": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Construir Respuesta": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}]
+}

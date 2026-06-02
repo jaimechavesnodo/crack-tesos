@@ -1,0 +1,178 @@
+{
+  "id": null,
+  "tenantId": "12679",
+  "name": "CT — Flujo Registro",
+  "isPro": true,
+  "channelTypes": ["WA"],
+  "flowNodes": [
+    {
+      "id": "reg-start",
+      "flowNodeType": "Message",
+      "isStartNode": true,
+      "flowNodePosition": {"posX": "80", "posY": "200"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>⚽ <strong>Crack Tesos 2026</strong></p><p>Un momento, consultando tus datos...</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "reg-wh-obtener",
+      "flowNodeType": "Webhook",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "420", "posY": "200"},
+      "methodType": "Post",
+      "url": "https://n8n-content-creation-nodo-n8n.5szgix.easypanel.host/webhook/crack-tesos/obtener-usuario",
+      "headers": [
+        {"key": "x-wati-token", "value": "CrackTesos2026_WH_Token"},
+        {"key": "Content-Type", "value": "application/json"}
+      ],
+      "body": "{\"phone\": \"{{phone}}\"}",
+      "testVariables": [{"key": "phone", "value": "573208439238"}],
+      "responseVariables": [
+        {"variable": "encontrado", "responseKey": "encontrado"},
+        {"variable": "nombre", "responseKey": "nombre"},
+        {"variable": "cedula", "responseKey": "cedula"},
+        {"variable": "registrado", "responseKey": "registrado"}
+      ],
+      "expectedStatuses": []
+    },
+    {
+      "id": "reg-cond-encontrado",
+      "flowNodeType": "Condition",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "760", "posY": "200"},
+      "flowNodeConditions": [{"id": "c1", "flowConditionType": "Equal", "variable": "encontrado", "value": "true"}],
+      "conditionOperator": "None",
+      "conditionResult": {"yResultNodeId": "reg-btn-confirmar", "nResultNodeId": "reg-msg-no-encontrado"}
+    },
+    {
+      "id": "reg-msg-no-encontrado",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1100", "posY": "500"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>No encontramos tu número en la base de participantes del <strong>Crack Tesos</strong>. Si crees que es un error, comunícate con tu distribuidor.</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "reg-btn-confirmar",
+      "flowNodeType": "InteractiveButtons",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1100", "posY": "100"},
+      "interactiveButtonsHeader": {"type": "Text", "text": "⚽ Crack Tesos — Confirma tus datos", "media": null},
+      "interactiveButtonsBody": "<p>Encontramos tu registro:</p><p>👤 Nombre: <strong>{{nombre}}</strong></p><p>🪪 Cédula: <strong>{{cedula}}</strong></p><p>¿Tus datos son correctos?</p>",
+      "interactiveButtonsFooter": "",
+      "interactiveButtonsItems": [
+        {"id": "btn-si", "buttonText": "✅ Confirmar datos", "nodeResultId": "reg-msg-tyc"},
+        {"id": "btn-no", "buttonText": "✏️ Actualizar datos", "nodeResultId": "reg-q-nombre"}
+      ],
+      "interactiveButtonsUserInputVariable": "confirmacion_datos",
+      "interactiveButtonsDefaultNodeResultId": ""
+    },
+    {
+      "id": "reg-q-nombre",
+      "flowNodeType": "Question",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1440", "posY": "400"},
+      "questionText": "<p>¿Cuál es tu <strong>nombre completo</strong>?</p>",
+      "questionVariable": "nombre_nuevo",
+      "validationType": "None"
+    },
+    {
+      "id": "reg-q-cedula",
+      "flowNodeType": "Question",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1780", "posY": "400"},
+      "questionText": "<p>¿Cuál es tu número de <strong>cédula</strong>? (solo números)</p>",
+      "questionVariable": "cedula_nueva",
+      "validationType": "None"
+    },
+    {
+      "id": "reg-msg-tyc",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1440", "posY": "0"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>📋 <strong>Términos y Condiciones</strong></p><p>Al participar en el Crack Tesos 2026 autorizas el uso de tus datos para la administración de la actividad, la comunicación de resultados y la entrega de premios. Tu participación es voluntaria.</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "reg-btn-tyc",
+      "flowNodeType": "InteractiveButtons",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "1780", "posY": "0"},
+      "interactiveButtonsHeader": {"type": "Text", "text": "", "media": null},
+      "interactiveButtonsBody": "<p>¿Aceptas los términos y condiciones?</p>",
+      "interactiveButtonsFooter": "",
+      "interactiveButtonsItems": [
+        {"id": "btn-acepto", "buttonText": "✅ Sí, acepto", "nodeResultId": "reg-wh-registro"},
+        {"id": "btn-no-acepto", "buttonText": "❌ No acepto", "nodeResultId": "reg-msg-no-acepta"}
+      ],
+      "interactiveButtonsUserInputVariable": "acepta_tyc",
+      "interactiveButtonsDefaultNodeResultId": ""
+    },
+    {
+      "id": "reg-wh-registro",
+      "flowNodeType": "Webhook",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "2120", "posY": "0"},
+      "methodType": "Post",
+      "url": "https://n8n-content-creation-nodo-n8n.5szgix.easypanel.host/webhook/crack-tesos/registro",
+      "headers": [
+        {"key": "x-wati-token", "value": "CrackTesos2026_WH_Token"},
+        {"key": "Content-Type", "value": "application/json"}
+      ],
+      "body": "{\"phone\": \"{{phone}}\", \"name\": \"@nombre_nuevo\", \"document_id\": \"@cedula_nueva\", \"terms_accepted\": true}",
+      "testVariables": [
+        {"key": "phone", "value": "573208439238"},
+        {"key": "nombre_nuevo", "value": "JAIME CHAVES"},
+        {"key": "cedula_nueva", "value": "80089925"}
+      ],
+      "responseVariables": [
+        {"variable": "reg_nombre", "responseKey": "name"}
+      ],
+      "expectedStatuses": []
+    },
+    {
+      "id": "reg-msg-exito",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "2460", "posY": "0"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>🎉 <strong>¡Listo, {{nombre}}!</strong></p><p>Ya estás registrado en el <strong>Crack Tesos 2026</strong> ⚽</p><p>Muy pronto recibirás trivias por WhatsApp. ¡Entre más rápido respondas correctamente, más Goles acumulas!</p><p>Escribe <strong>MENU</strong> en cualquier momento para consultar tus Goles y tu ranking.</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "reg-msg-no-acepta",
+      "flowNodeType": "Message",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "2120", "posY": "400"},
+      "flowReplies": [{"flowReplyType": "Text",
+        "data": "<p>Entendido. Para participar en el Crack Tesos es necesario aceptar los términos. Si cambias de opinión, escríbenos nuevamente. ¡Hasta pronto! 👋</p>",
+        "caption": "", "mimeType": ""}]
+    },
+    {
+      "id": "reg-close",
+      "flowNodeType": "UpdateChatStatus",
+      "isStartNode": false,
+      "flowNodePosition": {"posX": "2800", "posY": "200"},
+      "status": "TicketClosing"
+    }
+  ],
+  "flowEdges": [
+    {"id": "e01", "sourceNodeId": "reg-start", "targetNodeId": "reg-wh-obtener"},
+    {"id": "e02", "sourceNodeId": "reg-wh-obtener", "targetNodeId": "reg-cond-encontrado"},
+    {"id": "e03", "sourceNodeId": "reg-cond-encontrado__true", "targetNodeId": "reg-btn-confirmar"},
+    {"id": "e04", "sourceNodeId": "reg-cond-encontrado__false", "targetNodeId": "reg-msg-no-encontrado"},
+    {"id": "e05", "sourceNodeId": "reg-btn-confirmar__btn-si", "targetNodeId": "reg-msg-tyc"},
+    {"id": "e06", "sourceNodeId": "reg-btn-confirmar__btn-no", "targetNodeId": "reg-q-nombre"},
+    {"id": "e07", "sourceNodeId": "reg-q-nombre", "targetNodeId": "reg-q-cedula"},
+    {"id": "e08", "sourceNodeId": "reg-q-cedula", "targetNodeId": "reg-msg-tyc"},
+    {"id": "e09", "sourceNodeId": "reg-msg-tyc", "targetNodeId": "reg-btn-tyc"},
+    {"id": "e10", "sourceNodeId": "reg-btn-tyc__btn-acepto", "targetNodeId": "reg-wh-registro"},
+    {"id": "e11", "sourceNodeId": "reg-btn-tyc__btn-no-acepto", "targetNodeId": "reg-msg-no-acepta"},
+    {"id": "e12", "sourceNodeId": "reg-wh-registro", "targetNodeId": "reg-msg-exito"},
+    {"id": "e13", "sourceNodeId": "reg-msg-exito", "targetNodeId": "reg-close"},
+    {"id": "e14", "sourceNodeId": "reg-msg-no-acepta", "targetNodeId": "reg-close"},
+    {"id": "e15", "sourceNodeId": "reg-msg-no-encontrado", "targetNodeId": "reg-close"}
+  ]
+}
