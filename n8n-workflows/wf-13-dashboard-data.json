@@ -1,0 +1,180 @@
+{
+  "name": "CT WF-13 — Dashboard Data",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/dashboard/data",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook Dashboard",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $input.first().json.headers['x-admin-token'];\nif (!token) return [{json: {ok: false, error: 'No autorizado'}}];\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3 || parts[2] !== 'CrackTesos2026_Admin_Token') return [{json: {ok: false, error: 'Token inválido'}}];\n  const age = Date.now() - parseInt(parts[1]);\n  if (age > 8 * 3600 * 1000) return [{json: {ok: false, error: 'Sesión expirada'}}];\n  return [{json: {ok: true, email: parts[0]}}];\n} catch(e) { return [{json: {ok: false, error: 'Token inválido'}}]; }"
+      },
+      "id": "validate",
+      "name": "Validar Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "ok", "leftValue": "={{ $json.ok }}", "rightValue": "true", "operator": {"type": "string", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "¿Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  (SELECT COUNT(*) FROM ct_users WHERE status = 'active') AS total_usuarios,\n  (SELECT COUNT(*) FROM ct_users WHERE registered = true AND status = 'active') AS registrados,\n  (SELECT COUNT(DISTINCT user_id) FROM ct_trivia_responses WHERE is_duplicate = FALSE) AS activos,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_duplicate = FALSE) AS total_respuestas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct = TRUE AND is_duplicate = FALSE) AS correctas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct = FALSE AND is_duplicate = FALSE AND is_out_of_time = FALSE) AS incorrectas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_out_of_time = TRUE) AS fuera_de_tiempo,\n  (SELECT COALESCE(SUM(total_goals), 0) FROM ct_users WHERE status = 'active') AS goles_totales,\n  (SELECT COUNT(*) FROM ct_trivias WHERE status IN ('sent','closed','settled')) AS trivias_enviadas,\n  (SELECT COUNT(*) FROM ct_trivias WHERE has_multiplier = TRUE AND status IN ('sent','closed','settled')) AS trivias_con_multiplicador",
+        "options": {}
+      },
+      "id": "q-kpis",
+      "name": "Query KPIs",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 120],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT DATE(responded_at AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS respuestas, SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correctas FROM ct_trivia_responses WHERE is_duplicate = FALSE GROUP BY dia ORDER BY dia ASC",
+        "options": {}
+      },
+      "id": "q-daily",
+      "name": "Query Diario",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 240],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.agent_name, COUNT(DISTINCT u.user_id) AS participantes, COUNT(DISTINCT CASE WHEN u.registered THEN u.user_id END) AS registrados, COALESCE(SUM(u.total_goals), 0) AS goles, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_users u LEFT JOIN ct_trivia_responses r ON u.user_id = r.user_id AND r.is_duplicate = FALSE WHERE u.status = 'active' AND u.agent_name IS NOT NULL GROUP BY u.agent_name ORDER BY goles DESC",
+        "options": {}
+      },
+      "id": "q-agents",
+      "name": "Query Agentes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 360],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT t.trivia_number, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas, COUNT(CASE WHEN r.is_out_of_time THEN 1 END) AS fuera_tiempo, AVG(CASE WHEN r.is_correct THEN r.response_time_seconds END) AS avg_segundos FROM ct_trivias t LEFT JOIN ct_trivia_responses r ON t.trivia_id = r.trivia_id AND r.is_duplicate = FALSE WHERE t.status IN ('sent','closed','settled') GROUP BY t.trivia_number ORDER BY t.trivia_number",
+        "options": {}
+      },
+      "id": "q-trivias",
+      "name": "Query Trivias",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 480],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses WHERE is_correct = TRUE AND is_duplicate = FALSE AND speed_range > 0 GROUP BY speed_range ORDER BY speed_range",
+        "options": {}
+      },
+      "id": "q-speed",
+      "name": "Query Velocidad",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 600],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status = 'active' ORDER BY rank_general ASC LIMIT 50",
+        "options": {}
+      },
+      "id": "q-ranking",
+      "name": "Query Ranking",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 720],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const kpis = $('Query KPIs').first().json;\nconst daily = $('Query Diario').all().map(i => i.json);\nconst agents = $('Query Agentes').all().map(i => i.json);\nconst trivias = $('Query Trivias').all().map(i => i.json);\nconst speed = $('Query Velocidad').all().map(i => i.json);\nconst ranking = $('Query Ranking').all().map(i => i.json);\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis,\n  daily,\n  agents,\n  trivias,\n  speed,\n  ranking\n}}];"
+      },
+      "id": "build",
+      "name": "Construir Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 420]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 420]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={{ {ok: false, error: $('Validar Token').first().json.error} }}"
+      },
+      "id": "respond-error",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 900]
+    }
+  ],
+  "connections": {
+    "Webhook Dashboard": {"main": [[{"node": "Validar Token", "type": "main", "index": 0}]]},
+    "Validar Token": {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
+    "¿Válido?": {
+      "main": [
+        [
+          {"node": "Query KPIs", "type": "main", "index": 0},
+          {"node": "Query Diario", "type": "main", "index": 0},
+          {"node": "Query Agentes", "type": "main", "index": 0},
+          {"node": "Query Trivias", "type": "main", "index": 0},
+          {"node": "Query Velocidad", "type": "main", "index": 0},
+          {"node": "Query Ranking", "type": "main", "index": 0}
+        ],
+        [{"node": "Responder Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Query KPIs": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Query Diario": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Query Agentes": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Query Trivias": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Query Velocidad": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Query Ranking": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Construir Respuesta": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}, {"name": "dashboard"}]
+}

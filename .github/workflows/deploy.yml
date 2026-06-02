@@ -1,0 +1,42 @@
+name: Deploy Crack Tesos
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy web files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "web/*"
+          target: "/var/www/crack-tesos/"
+          strip_components: 1
+
+      - name: Update nginx config and reload
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cat > /etc/nginx-crack-tesos/conf.d/default.conf << 'EOF'
+            server {
+                listen 80;
+                root /usr/share/nginx/html;
+                location /crack-tesos/ {
+                    rewrite ^/crack-tesos/(.+)$ /$1 break;
+                    try_files $uri $uri/ /index.html;
+                }
+                gzip on;
+                gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+            }
+            EOF
+            docker exec $(docker ps -q --filter name=crack-tesos_app) nginx -s reload 2>/dev/null || true

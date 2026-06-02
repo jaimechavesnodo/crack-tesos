@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crack Tesos — Dashboard Analytics</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='46' fill='white' stroke='black' stroke-width='8'/%3E%3Cpath d='M25 22 L25 78 L42 78 L42 52 L58 78 L75 78 L75 22 L58 22 L58 48 L42 22 Z' fill='black'/%3E%3C/svg%3E">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;min-height:100vh}
+    .header{background:#1a1a2e;color:white;padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+    .header h1{font-size:17px;font-weight:600}
+    .badge{background:#e63946;color:white;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+    .header-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+    .user-info{font-size:13px;color:#aaa}
+    .nav-link{color:#aaa;font-size:13px;cursor:pointer;text-decoration:none;padding:6px 12px;border-radius:6px;transition:all .2s}
+    .nav-link:hover,.nav-link.active{color:white;background:rgba(255,255,255,.1)}
+    .screen{display:none}.screen.active{display:block}
+    .container{max-width:1200px;margin:0 auto;padding:24px 16px}
+
+    /* Login */
+    .login-wrap{max-width:400px;margin:80px auto;padding:0 16px}
+    .card{background:white;border-radius:12px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+    .card h2{font-size:22px;color:#1a1a2e;margin-bottom:8px}
+    .subtitle{color:#666;font-size:14px;margin-bottom:28px}
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;font-size:13px;font-weight:500;color:#444;margin-bottom:6px}
+    .form-group input{width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;outline:none;transition:border-color .2s}
+    .form-group input:focus{border-color:#e63946}
+    .btn{padding:12px 24px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+    .btn-primary{background:#e63946;color:white;width:100%}
+    .btn-primary:hover{background:#c1121f}
+    .btn-sm{padding:6px 14px;font-size:13px;background:#f0f2f5;color:#444;border-radius:6px}
+    .btn-sm:hover{background:#e0e0e0}
+    .error-msg{background:#fff0f0;border:1px solid #ffcdd2;color:#c62828;padding:10px;border-radius:8px;font-size:13px;margin-top:12px;display:none}
+
+    /* Tabs */
+    .tabs{display:flex;gap:4px;background:white;border-radius:10px;padding:4px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:24px;overflow-x:auto}
+    .tab{padding:8px 18px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;color:#666;transition:all .2s}
+    .tab.active{background:#1a1a2e;color:white}
+    .tab:hover:not(.active){background:#f0f2f5;color:#333}
+    .tab-content{display:none}.tab-content.active{display:block}
+
+    /* KPI Cards */
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px}
+    .kpi{background:white;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+    .kpi .val{font-size:32px;font-weight:700;color:#1a1a2e;line-height:1}
+    .kpi .lbl{font-size:12px;color:#888;margin-top:6px}
+    .kpi .sub{font-size:11px;color:#aaa;margin-top:4px}
+    .kpi.red .val{color:#e63946}
+    .kpi.green .val{color:#2d6a4f}
+    .kpi.blue .val{color:#0077b6}
+
+    /* Charts */
+    .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:20px;margin-bottom:24px}
+    .chart-box{background:white;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+    .chart-box h3{font-size:14px;font-weight:600;color:#333;margin-bottom:16px}
+    .chart-wrap{position:relative;height:260px}
+
+    /* Tables */
+    .table-box{background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:24px}
+    .table-header{padding:16px 20px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+    .table-header h3{font-size:14px;font-weight:600;color:#333}
+    .table-scroll{max-height:400px;overflow-y:auto}
+    table{width:100%;border-collapse:collapse}
+    th{background:#f8f9fa;padding:10px 16px;text-align:left;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0}
+    td{padding:10px 16px;border-top:1px solid #f0f0f0;font-size:13px}
+    tr:hover td{background:#fafafa}
+    .rank-num{font-weight:700;color:#666;width:32px}
+    .badge-gold{background:#fff3cd;color:#856404;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-silver{background:#f0f0f0;color:#555;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-bronze{background:#fde8d8;color:#8B4513;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+
+    /* Agent filter */
+    .filter-row{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+    .filter-row select{padding:7px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;outline:none;background:white;cursor:pointer}
+    .filter-row select:focus{border-color:#e63946}
+
+    /* Projection */
+    .proj-box{background:white;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:20px}
+    .proj-box h3{font-size:15px;font-weight:600;color:#333;margin-bottom:4px}
+    .proj-box .desc{font-size:13px;color:#888;margin-bottom:16px}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+    .stat-item{background:#f8f9fa;border-radius:8px;padding:14px;text-align:center}
+    .stat-item .sv{font-size:22px;font-weight:700;color:#1a1a2e}
+    .stat-item .sl{font-size:11px;color:#888;margin-top:4px}
+    .interp-box{border-radius:8px;padding:16px;margin-top:16px}
+    .interp-tech{background:#f0f4ff;border-left:3px solid #0077b6}
+    .interp-plain{background:#f0fdf4;border-left:3px solid #2d6a4f;margin-top:12px}
+    .interp-box h4{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;margin-bottom:8px}
+    .interp-box p{font-size:13px;line-height:1.6;color:#444}
+
+    /* Loading */
+    .loading{text-align:center;padding:48px;color:#888}
+    .spinner{display:inline-block;width:36px;height:36px;border:3px solid #f0f0f0;border-top-color:#e63946;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Refresh */
+    .refresh-bar{display:flex;align-items:center;gap:8px;font-size:12px;color:#888;margin-bottom:20px}
+    .refresh-dot{width:8px;height:8px;border-radius:50%;background:#2d6a4f}
+
+    @media(max-width:600px){
+      .kpi-grid{grid-template-columns:1fr 1fr}
+      .chart-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <svg width="28" height="28" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="white" stroke="white" stroke-width="1"/><circle cx="50" cy="50" r="46" fill="none" stroke="white" stroke-width="8"/><path d="M25 22 L25 78 L42 78 L42 52 L58 78 L75 78 L75 22 L58 22 L58 48 L42 22 Z" fill="white"/></svg>
+  <h1>Crack Tesos 2026</h1>
+  <span class="badge">Analytics</span>
+  <div class="header-right">
+    <span class="user-info" id="userInfo"></span>
+    <a class="nav-link" id="linkMult" href="index.html" style="display:none">⚽ Multiplicadores</a>
+    <span class="nav-link" onclick="doLogout()" style="cursor:pointer">Salir</span>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div class="screen active" id="screenLogin">
+  <div class="login-wrap">
+    <div class="card">
+      <h2>📊 Dashboard Analytics</h2>
+      <p class="subtitle">Ingresa con tu cuenta autorizada para ver el dashboard de Crack Tesos.</p>
+      <div class="form-group"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="tucorreo@ejemplo.com"></div>
+      <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
+      <button class="btn btn-primary" onclick="doLogin()">Ingresar al Dashboard</button>
+      <div class="error-msg" id="loginErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="screen" id="screenDash">
+  <div class="container">
+    <div class="refresh-bar">
+      <div class="refresh-dot"></div>
+      <span id="refreshLabel">Cargando datos...</span>
+      <button class="btn btn-sm" onclick="loadData()" style="margin-left:auto">↻ Actualizar</button>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('overview')">📊 Resumen</div>
+      <div class="tab" onclick="showTab('participation')">📈 Participación</div>
+      <div class="tab" onclick="showTab('rankings')">🏆 Rankings</div>
+      <div class="tab" onclick="showTab('agents')">🏢 Por Agente</div>
+      <div class="tab" onclick="showTab('projection')">🔭 Proyección</div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="tab-content active" id="tab-overview">
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="chart-grid">
+        <div class="chart-box"><h3>Respuestas correctas vs incorrectas</h3><div class="chart-wrap"><canvas id="chartDonut"></canvas></div></div>
+        <div class="chart-box"><h3>Distribución por bono de velocidad</h3><div class="chart-wrap"><canvas id="chartSpeed"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- PARTICIPATION -->
+    <div class="tab-content" id="tab-participation">
+      <div class="chart-box" style="margin-bottom:20px"><h3>Respuestas diarias</h3><div class="chart-wrap" style="height:300px"><canvas id="chartDaily"></canvas></div></div>
+      <div class="chart-box"><h3>Participación por trivia</h3><div class="chart-wrap" style="height:300px"><canvas id="chartTrivias"></canvas></div></div>
+    </div>
+
+    <!-- RANKINGS -->
+    <div class="tab-content" id="tab-rankings">
+      <div class="filter-row">
+        <label style="font-size:13px;font-weight:500">Filtrar por agente:</label>
+        <select id="agentFilter" onchange="renderRankingTable()"><option value="">Todos los participantes</option></select>
+      </div>
+      <div class="table-box">
+        <div class="table-header"><h3 id="rankingTitle">Ranking General — Top 50</h3></div>
+        <div class="table-scroll"><table><thead><tr><th>#</th><th>Participante</th><th>Agente</th><th>Goles ⚽</th><th>Correctas ✅</th><th>Respondidas</th><th>Vel. prom.</th></tr></thead><tbody id="rankingBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- AGENTS -->
+    <div class="tab-content" id="tab-agents">
+      <div class="chart-box" style="margin-bottom:20px"><h3>Goles acumulados por Agente Comercial</h3><div class="chart-wrap" style="height:350px"><canvas id="chartAgents"></canvas></div></div>
+      <div class="table-box">
+        <div class="table-header"><h3>Estadísticas por Agente Comercial</h3></div>
+        <div class="table-scroll"><table><thead><tr><th>Agente</th><th>Participantes</th><th>Registrados</th><th>Goles ⚽</th><th>Respuestas</th><th>Correctas</th><th>Tasa acierto</th></tr></thead><tbody id="agentsBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- PROJECTION -->
+    <div class="tab-content" id="tab-projection">
+      <div class="proj-box">
+        <h3>🔭 Modelo de Proyección de Participación</h3>
+        <p class="desc">Regresión lineal sobre participación acumulada diaria + bandas de proyección (±1 error estándar)</p>
+        <div class="stats-grid" id="projStats"></div>
+        <div class="chart-wrap" style="height:340px"><canvas id="chartProjection"></canvas></div>
+        <div id="projInterpretation"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const N8N = 'https://n8n-content-creation-nodo-n8n.5szgix.easypanel.host/webhook';
+let state = {token: null, email: null, nombre: null, role: null, data: null};
+let charts = {};
+
+// ========== AUTH ==========
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('screenLogin').classList.contains('active')) doLogin();
+});
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pass  = document.getElementById('loginPass').value;
+  if (!email || !pass) { showErr('loginErr', 'Ingresa tu correo y contraseña.'); return; }
+  try {
+    const r = await fetch(`${N8N}/crack-tesos/auth/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const d = await r.json();
+    if (!d.ok) { showErr('loginErr', d.error || 'Credenciales incorrectas.'); return; }
+    state = {...state, token: d.token, email: d.email, nombre: d.nombre, role: d.role};
+    document.getElementById('userInfo').textContent = `👤 ${d.nombre}`;
+    if (d.role !== 'viewer') document.getElementById('linkMult').style.display = 'block';
+    showScreen('screenDash');
+    loadData();
+  } catch(e) { showErr('loginErr', 'Error de conexión.'); }
+}
+
+function doLogout() {
+  state = {token:null,email:null,nombre:null,role:null,data:null};
+  showScreen('screenLogin');
+}
+
+// ========== DATA ==========
+async function loadData() {
+  document.getElementById('refreshLabel').textContent = 'Actualizando...';
+  try {
+    const r = await fetch(`${N8N}/crack-tesos/dashboard/data`, {
+      method: 'POST', headers: {'Content-Type':'application/json','x-admin-token': state.token},
+      body: JSON.stringify({})
+    });
+    const d = await r.json();
+    if (!d.ok) { document.getElementById('refreshLabel').textContent = 'Error al cargar datos'; return; }
+    state.data = d;
+    document.getElementById('refreshLabel').textContent = `Actualizado: ${d.generated_at}`;
+    renderAll();
+  } catch(e) { document.getElementById('refreshLabel').textContent = 'Error de conexión'; }
+}
+
+function renderAll() {
+  renderKPIs();
+  renderDonut();
+  renderSpeed();
+  renderDaily();
+  renderTrivias();
+  renderAgentChart();
+  renderAgentsTable();
+  populateAgentFilter();
+  renderRankingTable();
+  renderProjection();
+}
+
+// ========== KPIs ==========
+function renderKPIs() {
+  const k = state.data.kpis;
+  const tasa = k.total_respuestas > 0 ? Math.round(k.correctas / k.total_respuestas * 100) : 0;
+  const regRate = k.total_usuarios > 0 ? Math.round(k.registrados / k.total_usuarios * 100) : 0;
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi blue"><div class="val">${k.total_usuarios}</div><div class="lbl">Participantes en base</div></div>
+    <div class="kpi green"><div class="val">${k.registrados}</div><div class="lbl">Registrados</div><div class="sub">${regRate}% de la base</div></div>
+    <div class="kpi"><div class="val">${k.activos}</div><div class="lbl">Han participado</div></div>
+    <div class="kpi"><div class="val">${k.total_respuestas}</div><div class="lbl">Respuestas totales</div></div>
+    <div class="kpi green"><div class="val">${tasa}%</div><div class="lbl">Tasa de acierto</div><div class="sub">${k.correctas} correctas</div></div>
+    <div class="kpi red"><div class="val">${Number(k.goles_totales).toLocaleString()}</div><div class="lbl">Goles acumulados ⚽</div></div>
+    <div class="kpi"><div class="val">${k.trivias_enviadas}</div><div class="lbl">Trivias enviadas</div><div class="sub">${k.trivias_con_multiplicador} con multiplicador</div></div>
+  `;
+}
+
+// ========== CHARTS ==========
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function renderDonut() {
+  const k = state.data.kpis;
+  destroyChart('donut');
+  charts.donut = new Chart(document.getElementById('chartDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Correctas', 'Incorrectas', 'Fuera de tiempo'],
+      datasets: [{data: [k.correctas, k.incorrectas, k.fuera_de_tiempo], backgroundColor: ['#2d6a4f','#e63946','#f4a261'], borderWidth: 2}]
+    },
+    options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}
+  });
+}
+
+function renderSpeed() {
+  const sp = state.data.speed;
+  const labels = ['0-5 min\n+50⚽','5-15 min\n+35⚽','15-30 min\n+25⚽','30min-6h\n+15⚽','6-24h\n+5⚽'];
+  const vals = [1,2,3,4,5].map(r => { const f = sp.find(s => parseInt(s.speed_range) === r); return f ? parseInt(f.cantidad) : 0; });
+  destroyChart('speed');
+  charts.speed = new Chart(document.getElementById('chartSpeed'), {
+    type: 'bar',
+    data: { labels, datasets: [{label: 'Respuestas correctas', data: vals, backgroundColor: ['#2d6a4f','#52b788','#74c69d','#95d5b2','#b7e4c7'], borderRadius:6}] },
+    options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+  });
+}
+
+function renderDaily() {
+  const daily = state.data.daily;
+  destroyChart('daily');
+  charts.daily = new Chart(document.getElementById('chartDaily'), {
+    type: 'bar',
+    data: {
+      labels: daily.map(d => d.dia),
+      datasets: [
+        {label:'Respuestas totales', data: daily.map(d => d.respuestas), backgroundColor:'#0077b630', borderColor:'#0077b6', borderWidth:2, type:'bar'},
+        {label:'Correctas', data: daily.map(d => d.correctas), backgroundColor:'#2d6a4f', borderRadius:4, type:'bar'}
+      ]
+    },
+    options: {responsive:true, maintainAspectRatio:false, scales:{x:{stacked:false},y:{beginAtZero:true}}, plugins:{legend:{position:'bottom'}}}
+  });
+}
+
+function renderTrivias() {
+  const tr = state.data.trivias;
+  destroyChart('trivias');
+  charts.trivias = new Chart(document.getElementById('chartTrivias'), {
+    type: 'bar',
+    data: {
+      labels: tr.map(t => `Trivia #${t.trivia_number}`),
+      datasets: [
+        {label:'Correctas', data: tr.map(t => t.correctas || 0), backgroundColor:'#2d6a4f', borderRadius:4},
+        {label:'Incorrectas', data: tr.map(t => (t.respuestas - t.correctas - t.fuera_tiempo) || 0), backgroundColor:'#e63946', borderRadius:4},
+        {label:'Fuera de tiempo', data: tr.map(t => t.fuera_tiempo || 0), backgroundColor:'#f4a261', borderRadius:4}
+      ]
+    },
+    options: {responsive:true, maintainAspectRatio:false, scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}, plugins:{legend:{position:'bottom'}}}
+  });
+}
+
+function renderAgentChart() {
+  const ag = state.data.agents.slice(0, 18);
+  destroyChart('agents');
+  charts.agents = new Chart(document.getElementById('chartAgents'), {
+    type: 'bar',
+    data: {
+      labels: ag.map(a => a.agent_name || 'Sin agente'),
+      datasets: [{label:'Goles ⚽', data: ag.map(a => a.goles || 0), backgroundColor:'#e63946', borderRadius:4}]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      indexAxis:'y',
+      plugins:{legend:{display:false}},
+      scales:{x:{beginAtZero:true}}
+    }
+  });
+}
+
+function renderAgentsTable() {
+  const ag = state.data.agents;
+  document.getElementById('agentsBody').innerHTML = ag.map(a => {
+    const tasa = a.respuestas > 0 ? Math.round(a.correctas / a.respuestas * 100) : 0;
+    return `<tr>
+      <td><strong>${a.agent_name || 'Sin agente'}</strong></td>
+      <td>${a.participantes}</td>
+      <td>${a.registrados}</td>
+      <td><strong>${Number(a.goles).toLocaleString()} ⚽</strong></td>
+      <td>${a.respuestas}</td>
+      <td>${a.correctas}</td>
+      <td>${tasa}%</td>
+    </tr>`;
+  }).join('');
+}
+
+function populateAgentFilter() {
+  const sel = document.getElementById('agentFilter');
+  const agents = [...new Set(state.data.ranking.map(r => r.agent_name).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los participantes</option>' +
+    agents.map(a => `<option value="${a}">${a}</option>`).join('');
+}
+
+function renderRankingTable() {
+  const filter = document.getElementById('agentFilter').value;
+  let data = state.data.ranking;
+  if (filter) data = data.filter(r => r.agent_name === filter);
+  document.getElementById('rankingTitle').textContent = filter ? `Ranking — ${filter}` : 'Ranking General — Top 50';
+  document.getElementById('rankingBody').innerHTML = data.map((r, i) => {
+    const pos = i + 1;
+    const badge = pos === 1 ? 'badge-gold' : pos === 2 ? 'badge-silver' : pos === 3 ? 'badge-bronze' : '';
+    const posLabel = badge ? `<span class="${badge}">${pos}°</span>` : `<span class="rank-num">${pos}°</span>`;
+    const vel = r.avg_speed_seconds ? `${Math.round(r.avg_speed_seconds/60)}m` : '—';
+    return `<tr>
+      <td>${posLabel}</td>
+      <td><strong>${r.name}</strong></td>
+      <td style="color:#888;font-size:12px">${r.agent_name || '—'}</td>
+      <td><strong>${r.total_goals} ⚽</strong></td>
+      <td>${r.correct_count}</td>
+      <td>${r.total_responses}</td>
+      <td>${vel}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ========== PROJECTION ==========
+function linearRegression(pts) {
+  const n = pts.length;
+  if (n < 3) return null;
+  const sx = pts.reduce((s, p) => s + p.x, 0);
+  const sy = pts.reduce((s, p) => s + p.y, 0);
+  const sxy = pts.reduce((s, p) => s + p.x * p.y, 0);
+  const sx2 = pts.reduce((s, p) => s + p.x * p.x, 0);
+  const slope = (n * sxy - sx * sy) / (n * sx2 - sx * sx);
+  const intercept = (sy - slope * sx) / n;
+  const predicted = pts.map(p => slope * p.x + intercept);
+  const residuals = pts.map((p, i) => p.y - predicted[i]);
+  const sse = residuals.reduce((s, r) => s + r * r, 0);
+  const se = Math.sqrt(sse / Math.max(n - 2, 1));
+  const yMean = sy / n;
+  const sst = pts.reduce((s, p) => s + (p.y - yMean) ** 2, 0);
+  const r2 = sst > 0 ? 1 - sse / sst : 0;
+  return { slope, intercept, se, r2, residuals, predicted, n };
+}
+
+function renderProjection() {
+  const daily = state.data.daily;
+  if (daily.length < 2) {
+    document.getElementById('projStats').innerHTML = '<p style="color:#888;padding:16px">Insuficientes datos para proyección. Se necesitan al menos 2 días de actividad.</p>';
+    return;
+  }
+
+  // Construir serie acumulativa
+  let cumulative = 0;
+  const pts = daily.map((d, i) => { cumulative += parseInt(d.respuestas); return {x: i + 1, y: cumulative, label: d.dia}; });
+
+  const reg = linearRegression(pts);
+  if (!reg) return;
+
+  // Proyectar hasta día 37 (11 jun - 17 jul = 37 días)
+  const totalDays = 37;
+  const futureDays = [];
+  for (let i = pts.length + 1; i <= totalDays; i++) futureDays.push(i);
+
+  const allLabels = [...pts.map(p => p.label), ...futureDays.map(d => `Día ${d}`)];
+  const actualData = [...pts.map(p => p.y), ...futureDays.map(() => null)];
+  const trendData = allLabels.map((_, i) => reg.slope * (i + 1) + reg.intercept);
+  const upperBand = trendData.map(v => v + reg.se);
+  const lowerBand = trendData.map(v => Math.max(0, v - reg.se));
+
+  // Proyección final
+  const projFinal = Math.round(reg.slope * totalDays + reg.intercept);
+  const projNext = pts.length < totalDays ? Math.round(reg.slope * (pts.length + 1) + reg.intercept) : null;
+
+  // Stats
+  document.getElementById('projStats').innerHTML = `
+    <div class="stat-item"><div class="sv">${reg.slope.toFixed(1)}</div><div class="sl">Pendiente (resp/día)</div></div>
+    <div class="stat-item"><div class="sv">${(reg.r2 * 100).toFixed(0)}%</div><div class="sl">R² (ajuste del modelo)</div></div>
+    <div class="stat-item"><div class="sv">${reg.se.toFixed(0)}</div><div class="sl">Error estándar</div></div>
+    <div class="stat-item"><div class="sv">${projFinal}</div><div class="sl">Proyección día 37</div></div>
+  `;
+
+  // Chart
+  destroyChart('projection');
+  charts.projection = new Chart(document.getElementById('chartProjection'), {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [
+        {label: 'Respuestas reales (acum.)', data: actualData, borderColor: '#e63946', backgroundColor: '#e6394620', borderWidth: 2, pointRadius: 3, fill: false},
+        {label: 'Tendencia (regresión)', data: trendData, borderColor: '#0077b6', borderWidth: 2, borderDash: [5,5], pointRadius: 0, fill: false},
+        {label: 'Banda superior (+1 SE)', data: upperBand, borderColor: '#0077b640', backgroundColor: '#0077b610', borderWidth: 1, pointRadius: 0, fill: '+1'},
+        {label: 'Banda inferior (-1 SE)', data: lowerBand, borderColor: '#0077b640', backgroundColor: '#0077b610', borderWidth: 1, pointRadius: 0, fill: false}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {position: 'bottom'}},
+      scales: {x: {ticks: {maxTicksLimit: 10}}, y: {beginAtZero: true}}
+    }
+  });
+
+  // Interpretación
+  const trendDir = reg.slope > 2 ? 'creciente' : reg.slope > 0 ? 'ligeramente creciente' : 'decreciente';
+  const r2Quality = reg.r2 > 0.85 ? 'muy alto' : reg.r2 > 0.6 ? 'moderado' : 'bajo';
+  const projRange = `[${Math.round(projFinal - reg.se)} – ${Math.round(projFinal + reg.se)}]`;
+
+  document.getElementById('projInterpretation').innerHTML = `
+    <div class="interp-box interp-tech">
+      <h4>🔬 Interpretación técnica</h4>
+      <p>El modelo de regresión lineal simple ajustado sobre ${reg.n} puntos muestra una pendiente de <strong>${reg.slope.toFixed(2)} respuestas/día</strong> (tendencia ${trendDir}). El coeficiente de determinación R² = ${(reg.r2 * 100).toFixed(1)}% indica un ajuste ${r2Quality} del modelo a los datos históricos. El error estándar de los residuales es SE = ${reg.se.toFixed(1)}, lo que produce una banda de proyección de ±${reg.se.toFixed(0)} respuestas. Para el día ${totalDays} de actividad, la proyección puntual es ${projFinal} respuestas acumuladas, con intervalo de confianza aproximado de 68%: ${projRange}.</p>
+    </div>
+    <div class="interp-box interp-plain">
+      <h4>💬 En palabras sencillas</h4>
+      <p>El sistema está analizando cómo ha crecido la participación día a día. ${reg.slope > 1 ? `Cada día llegan aproximadamente <strong>${Math.round(reg.slope)} respuestas nuevas</strong>, lo que indica que la actividad tiene buena tracción.` : 'La participación diaria es baja, lo que puede indicar que es necesario aumentar las comunicaciones.'} Si la tendencia se mantiene así, al finalizar el Crack Tesos (día ${totalDays}) se esperaría llegar a aproximadamente <strong>${projFinal} respuestas acumuladas</strong>. La línea azul punteada muestra hacia dónde va el ritmo actual, y la zona sombreada indica el margen de variación esperado. ${reg.r2 > 0.7 ? 'Los datos históricos son consistentes, así que esta proyección es bastante confiable.' : 'Como hay pocos días de datos, esta proyección puede cambiar significativamente con más actividad.'}</p>
+    </div>`;
+}
+
+// ========== UTILS ==========
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function showTab(id) {
+  document.querySelectorAll('.tab').forEach((t, i) => { t.classList.remove('active'); if (t.getAttribute('onclick').includes(id)) t.classList.add('active'); });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+}
+function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 5000); }
+</script>
+</body>
+</html>
