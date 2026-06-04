@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const token = $input.first().json.headers['x-admin-token'];\nif (!token) return [{json: {ok: 'false', error: 'No autorizado'}}];\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3 || parts[2] !== 'CrackTesos2026_Admin_Token') {\n    return [{json: {ok: 'false', error: 'Token inválido'}}];\n  }\n  const tokenAge = Date.now() - parseInt(parts[1]);\n  if (tokenAge > 8 * 3600 * 1000) return [{json: {ok: 'false', error: 'Sesión expirada'}}];\n} catch(e) {\n  return [{json: {ok: 'false', error: 'Token inválido'}}];\n}\nconst body = $input.first().json.body;\nif (!body.trivia_id || !body.trivia_number || !body.eligible_users?.length) {\n  return [{json: {ok: 'false', error: 'Datos incompletos para aplicar multiplicador'}}];\n}\nreturn [{json: {\n  ok: 'true',\n  trivia_id: body.trivia_id,\n  trivia_number: body.trivia_number,\n  eligible_users: body.eligible_users,\n  operator_email: body.operator_email || 'unknown',\n  source_file: body.source_file || 'upload',\n  batch_id: null\n}}];"
+        "jsCode": "const token = $input.first().json.headers['x-admin-token'];\nif (!token) return [{json: {ok: 'false', error: 'No autorizado'}}];\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3 || parts[2] !== 'CrackTesos2026_Admin_Token') {\n    return [{json: {ok: 'false', error: 'Token inválido'}}];\n  }\n  const tokenAge = Date.now() - parseInt(parts[1]);\n  if (tokenAge > 8 * 3600 * 1000) return [{json: {ok: 'false', error: 'Sesión expirada'}}];\n} catch(e) {\n  return [{json: {ok: 'false', error: 'Token inválido'}}];\n}\nconst body = $input.first().json.body;\nif (!body.trivia_id || !body.trivia_number || !body.eligible_users?.length) {\n  return [{json: {ok: 'false', error: 'Datos incompletos'}}];\n}\nreturn [{json: {\n  ok: 'true',\n  trivia_id: body.trivia_id,\n  trivia_number: body.trivia_number,\n  eligible_users: body.eligible_users,\n  operator_email: body.operator_email || 'unknown',\n  source_file: body.source_file || 'upload'\n}}];"
       },
       "id": "validate",
       "name": "Validar",
@@ -41,89 +41,37 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO ct_multiplier_batches (trivia_id, trivia_number, source_file, total_records_file, eligible_records, applied_records, status, applied_at, applied_by, ip_address)\nVALUES (\n  '{{ $json.trivia_id }}',\n  {{ $json.trivia_number }},\n  '{{ $json.source_file }}',\n  {{ $json.eligible_users.length }},\n  {{ $json.eligible_users.length }},\n  0,\n  'processing',\n  NOW() AT TIME ZONE 'America/Bogota',\n  '{{ $json.operator_email }}',\n  'web-module'\n)\nRETURNING batch_id",
-        "options": {}
-      },
-      "id": "create-batch",
-      "name": "Crear Lote",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [900, 200],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
-    },
-    {
-      "parameters": {
-        "jsCode": "const validated = $('Validar').first().json;\nconst batchRow = $input.first().json;\nconst batchId = batchRow.batch_id;\n\n// Cada usuario tiene su propio multiplicador calculado por rangos de códigos\nconst users = validated.eligible_users.filter(u => !u.already_applied && u.multiplier > 0);\n\nif (users.length === 0) {\n  return [{json: {ok: 'false', error: 'Todos los usuarios ya tienen el multiplicador aplicado'}}];\n}\n\n// Ledger: descripción incluye multiplicador y cantidad de códigos por usuario\nconst ledgerValues = users.map(u =>\n  `('${u.user_id}', '${validated.trivia_id}', ${validated.trivia_number}, 'multiplier_bonus', ${u.goals_to_add}, 'x${u.multiplier} por ${u.number_of_codes} códigos — Trivia #${validated.trivia_number}', '${batchId}', 'admin:${validated.operator_email}')`\n).join(',');\n\nconst responseUpdates = users.map(u =>\n  `UPDATE ct_trivia_responses SET multiplier_bonus = ${u.goals_to_add}, final_goals = ${u.goals_final} WHERE response_id = '${u.response_id}';`\n).join('\\n');\n\nconst userUpdates = users.map(u =>\n  `UPDATE ct_users SET total_goals = total_goals + ${u.goals_to_add}, updated_at = NOW() WHERE user_id = '${u.user_id}';`\n).join('\\n');\n\nconst totalGoalsAdded = users.reduce((s, u) => s + u.goals_to_add, 0);\n\nreturn [{json: {\n  ok: 'true',\n  batch_id: batchId,\n  trivia_id: validated.trivia_id,\n  trivia_number: validated.trivia_number,\n  operator_email: validated.operator_email,\n  users_count: users.length,\n  total_goals_added: totalGoalsAdded,\n  ledger_values: ledgerValues,\n  response_updates: responseUpdates,\n  user_updates: userUpdates\n}}];"
+        "jsCode": "const validated = $('Validar').first().json;\n\n// Generar batch_id en JavaScript (evita nodo SQL problemático)\nconst batchId = 'batch-' + Date.now() + '-' + Math.random().toString(36).substr(2,9);\n\nconst users = validated.eligible_users.filter(u => !u.already_applied && u.multiplier > 0);\n\nif (users.length === 0) {\n  return [{json: {ok: 'false', error: 'Todos los usuarios ya tienen el multiplicador aplicado'}}];\n}\n\nconst totalGoalsAdded = users.reduce((s, u) => s + u.goals_to_add, 0);\n\n// Batch INSERT\nconst batchInsert = `INSERT INTO ct_multiplier_batches (batch_id, trivia_id, trivia_number, source_file, total_records_file, eligible_records, applied_records, total_goals_added, status, applied_at, applied_by, ip_address)\nVALUES ('${batchId}', '${validated.trivia_id}', ${validated.trivia_number}, '${validated.source_file}', ${users.length}, ${users.length}, ${users.length}, ${totalGoalsAdded}, 'applied', NOW() AT TIME ZONE 'America/Bogota', '${validated.operator_email}', 'web-module');`;\n\n// Ledger INSERT\nconst ledgerValues = users.map(u =>\n  `('${u.user_id}', '${validated.trivia_id}', ${validated.trivia_number}, 'multiplier_bonus', ${u.goals_to_add}, 'x${u.multiplier} por ${u.number_of_codes} códigos — Trivia #${validated.trivia_number}', '${batchId}', 'admin:${validated.operator_email}')`\n).join(',');\nconst ledgerInsert = `INSERT INTO ct_scoring_ledger (user_id, trivia_id, trivia_number, movement_type, amount, description, reference_id, created_by) VALUES ${ledgerValues};`;\n\n// Response updates\nconst responseUpdates = users.map(u =>\n  `UPDATE ct_trivia_responses SET multiplier_bonus = ${u.goals_to_add}, final_goals = ${u.goals_final} WHERE response_id = '${u.response_id}';`\n).join('\\n');\n\n// User updates\nconst userUpdates = users.map(u =>\n  `UPDATE ct_users SET total_goals = total_goals + ${u.goals_to_add}, updated_at = NOW() WHERE user_id = '${u.user_id}';`\n).join('\\n');\n\n// Audit log\nconst auditInsert = `INSERT INTO ct_audit_logs (event_type, operator_email, trivia_number, user_affected, payload, result, ip_address) VALUES ('multiplier_applied', '${validated.operator_email}', ${validated.trivia_number}, 'bulk:${users.length}', '{\"batch_id\": \"${batchId}\", \"total_goals_added\": ${totalGoalsAdded}}'::jsonb, 'success', 'web-module');`;\n\nreturn [{json: {\n  ok: 'true',\n  batch_id: batchId,\n  trivia_id: validated.trivia_id,\n  trivia_number: validated.trivia_number,\n  operator_email: validated.operator_email,\n  users_count: users.length,\n  total_goals_added: totalGoalsAdded,\n  batch_insert: batchInsert,\n  ledger_insert: ledgerInsert,\n  response_updates: responseUpdates,\n  user_updates: userUpdates,\n  audit_insert: auditInsert\n}}];"
       },
       "id": "build-sql",
       "name": "Preparar SQL",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 200]
+      "position": [900, 200]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO ct_scoring_ledger (user_id, trivia_id, trivia_number, movement_type, amount, description, reference_id, created_by)\nVALUES {{ $json.ledger_values }};",
+        "query": "{{ $json.batch_insert }}\n{{ $json.ledger_insert }}\n{{ $json.response_updates }}\n{{ $json.user_updates }}\n{{ $json.audit_insert }}",
         "options": {}
       },
-      "id": "insert-ledger",
-      "name": "Insertar Ledger",
+      "id": "ejecutar-todo",
+      "name": "Ejecutar Todo",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1340, 200],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "{{ $('Preparar SQL').first().json.response_updates }}",
-        "options": {}
-      },
-      "id": "update-responses",
-      "name": "Actualizar Respuestas",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [1560, 200],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "{{ $('Preparar SQL').first().json.user_updates }}\nUPDATE ct_multiplier_batches SET status = 'applied', applied_records = {{ $('Preparar SQL').first().json.users_count }}, total_goals_added = {{ $('Preparar SQL').first().json.total_goals_added }} WHERE batch_id = '{{ $('Preparar SQL').first().json.batch_id }}';",
-        "options": {}
-      },
-      "id": "update-users",
-      "name": "Actualizar Usuarios",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [1780, 200],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
-    },
-    {
-      "parameters": {
-        "operation": "executeQuery",
-        "query": "INSERT INTO ct_audit_logs (event_type, operator_email, trivia_number, user_affected, payload, result, ip_address)\nVALUES ('multiplier_applied', '{{ $('Preparar SQL').first().json.operator_email }}', {{ $('Preparar SQL').first().json.trivia_number }}, 'bulk:{{ $('Preparar SQL').first().json.users_count }}', '{\"batch_id\": \"{{ $('Preparar SQL').first().json.batch_id }}\", \"multiplier\": {{ $('Preparar SQL').first().json.multiplier }}, \"total_goals_added\": {{ $('Preparar SQL').first().json.total_goals_added }}}'::jsonb, 'success', 'web-module')",
-        "options": {}
-      },
-      "id": "audit-log",
-      "name": "Audit Log",
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.5,
-      "position": [2000, 200],
+      "position": [1120, 200],
       "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ {ok: 'true', status: 'applied', batch_id: $('Preparar SQL').first().json.batch_id, users_count: $('Preparar SQL').first().json.users_count, total_goals_added: $('Preparar SQL').first().json.total_goals_added, trivia_number: $('Preparar SQL').first().json.trivia_number, multiplier: $('Preparar SQL').first().json.multiplier} }}"
+        "responseBody": "={{ {ok: 'true', status: 'applied', batch_id: $('Preparar SQL').first().json.batch_id, users_count: $('Preparar SQL').first().json.users_count, total_goals_added: $('Preparar SQL').first().json.total_goals_added, trivia_number: $('Preparar SQL').first().json.trivia_number} }}"
       },
       "id": "respond",
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2220, 200]
+      "position": [1340, 200]
     },
     {
       "parameters": {
@@ -143,16 +91,12 @@
     "Validar": {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
     "¿Válido?": {
       "main": [
-        [{"node": "Crear Lote", "type": "main", "index": 0}],
+        [{"node": "Preparar SQL", "type": "main", "index": 0}],
         [{"node": "Responder Error", "type": "main", "index": 0}]
       ]
     },
-    "Crear Lote": {"main": [[{"node": "Preparar SQL", "type": "main", "index": 0}]]},
-    "Preparar SQL": {"main": [[{"node": "Insertar Ledger", "type": "main", "index": 0}]]},
-    "Insertar Ledger": {"main": [[{"node": "Actualizar Respuestas", "type": "main", "index": 0}]]},
-    "Actualizar Respuestas": {"main": [[{"node": "Actualizar Usuarios", "type": "main", "index": 0}]]},
-    "Actualizar Usuarios": {"main": [[{"node": "Audit Log", "type": "main", "index": 0}]]},
-    "Audit Log": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+    "Preparar SQL": {"main": [[{"node": "Ejecutar Todo", "type": "main", "index": 0}]]},
+    "Ejecutar Todo": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
   },
   "settings": {"executionOrder": "v1"},
   "tags": [{"name": "crack-tesos"}, {"name": "multiplicadores"}]
