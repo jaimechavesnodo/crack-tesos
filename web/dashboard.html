@@ -313,7 +313,7 @@ function renderDaily() {
   charts.daily = new Chart(document.getElementById('chartDaily'), {
     type: 'bar',
     data: {
-      labels: daily.map(d => d.dia),
+      labels: daily.map(d => { try { return new Date(d.dia).toLocaleDateString('es-CO',{day:'2-digit',month:'short',timeZone:'UTC'}); } catch(e){ return d.dia; } }),
       datasets: [
         {label:'Respuestas totales', data: daily.map(d => d.respuestas), backgroundColor:'#0077b630', borderColor:'#0077b6', borderWidth:2, type:'bar'},
         {label:'Correctas', data: daily.map(d => d.correctas), backgroundColor:'#2d6a4f', borderRadius:4, type:'bar'}
