@@ -278,7 +278,7 @@ async function doLogin() {
       body: JSON.stringify({email, password})
     });
     const data = await res.json();
-    if (!data.ok) { showError('loginError', data.error || 'Credenciales incorrectas.'); return; }
+    if (!data.ok || data.ok === 'false') { showError('loginError', data.error || 'Credenciales incorrectas.'); return; }
 
     state.token = data.token;
     state.email = data.email;
@@ -500,7 +500,7 @@ async function doApply() {
     });
     const data = await res.json();
 
-    if (!data.ok) {
+    if (!data.ok || data.ok === 'false') {
       showScreen('screenPreview');
       alert('Error al aplicar: ' + (data.error || 'Error desconocido'));
       return;
