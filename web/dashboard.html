@@ -336,7 +336,7 @@ function renderTrivias() {
         {label:'Fuera de tiempo', data: tr.map(t => t.fuera_tiempo || 0), backgroundColor:'#f4a261', borderRadius:4}
       ]
     },
-    options: {responsive:true, maintainAspectRatio:false, scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}, plugins:{legend:{position:'bottom'}}}
+    options: {responsive:true, maintainAspectRatio:false, scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1,precision:0}}}, plugins:{legend:{position:'bottom'}}}
   });
 }
 
