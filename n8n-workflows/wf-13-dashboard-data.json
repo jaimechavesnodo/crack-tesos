@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const token = $input.first().json.headers['x-admin-token'];\nif (!token) return [{json: {ok: false, error: 'No autorizado'}}];\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3 || parts[2] !== 'CrackTesos2026_Admin_Token') return [{json: {ok: false, error: 'Token inválido'}}];\n  const age = Date.now() - parseInt(parts[1]);\n  if (age > 8 * 3600 * 1000) return [{json: {ok: false, error: 'Sesión expirada'}}];\n  return [{json: {ok: true, email: parts[0]}}];\n} catch(e) { return [{json: {ok: false, error: 'Token inválido'}}]; }"
+        "jsCode": "const token = $input.first().json.headers['x-admin-token'];\nif (!token) return [{json: {ok: 'false', error: 'No autorizado'}}];\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3 || parts[2] !== 'CrackTesos2026_Admin_Token') return [{json: {ok: 'false', error: 'Token inválido'}}];\n  const age = Date.now() - parseInt(parts[1]);\n  if (age > 8 * 3600 * 1000) return [{json: {ok: 'false', error: 'Sesión expirada'}}];\n  return [{json: {ok: 'true', email: parts[0]}}];\n} catch(e) { return [{json: {ok: 'false', error: 'Token inválido'}}]; }"
       },
       "id": "validate",
       "name": "Validar Token",
@@ -49,7 +49,7 @@
       "name": "Query KPIs",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [900, 120],
+      "position": [900, 300],
       "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
     },
     {
@@ -62,7 +62,7 @@
       "name": "Query Diario",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [900, 240],
+      "position": [1120, 300],
       "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
     },
     {
@@ -75,20 +75,20 @@
       "name": "Query Agentes",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [900, 360],
+      "position": [1340, 300],
       "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT t.trivia_number, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas, COUNT(CASE WHEN r.is_out_of_time THEN 1 END) AS fuera_tiempo, AVG(CASE WHEN r.is_correct THEN r.response_time_seconds END) AS avg_segundos FROM ct_trivias t LEFT JOIN ct_trivia_responses r ON t.trivia_id = r.trivia_id AND r.is_duplicate = FALSE WHERE t.status IN ('sent','closed','settled') GROUP BY t.trivia_number ORDER BY t.trivia_number",
+        "query": "SELECT t.trivia_number, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas, COUNT(CASE WHEN r.is_out_of_time THEN 1 END) AS fuera_tiempo, AVG(CASE WHEN r.is_correct THEN r.response_seconds END) AS avg_segundos FROM ct_trivias t LEFT JOIN ct_trivia_responses r ON t.trivia_id = r.trivia_id AND r.is_duplicate = FALSE WHERE t.status IN ('sent','closed','settled') GROUP BY t.trivia_number ORDER BY t.trivia_number",
         "options": {}
       },
       "id": "q-trivias",
       "name": "Query Trivias",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [900, 480],
+      "position": [1560, 300],
       "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
     },
     {
@@ -101,7 +101,7 @@
       "name": "Query Velocidad",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [900, 600],
+      "position": [1780, 300],
       "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
     },
     {
@@ -114,18 +114,18 @@
       "name": "Query Ranking",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [900, 720],
+      "position": [2000, 300],
       "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
     },
     {
       "parameters": {
-        "jsCode": "const kpis = $('Query KPIs').first().json;\nconst daily = $('Query Diario').all().map(i => i.json);\nconst agents = $('Query Agentes').all().map(i => i.json);\nconst trivias = $('Query Trivias').all().map(i => i.json);\nconst speed = $('Query Velocidad').all().map(i => i.json);\nconst ranking = $('Query Ranking').all().map(i => i.json);\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis,\n  daily,\n  agents,\n  trivias,\n  speed,\n  ranking\n}}];"
+        "jsCode": "const kpis   = $('Query KPIs').first().json;\nconst daily   = $('Query Diario').all().map(i => i.json);\nconst agents  = $('Query Agentes').all().map(i => i.json);\nconst trivias = $('Query Trivias').all().map(i => i.json);\nconst speed   = $('Query Velocidad').all().map(i => i.json);\nconst ranking = $('Query Ranking').all().map(i => i.json);\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis,\n  daily,\n  agents,\n  trivias,\n  speed,\n  ranking\n}}];"
       },
       "id": "build",
       "name": "Construir Respuesta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 420]
+      "position": [2220, 300]
     },
     {
       "parameters": {
@@ -136,7 +136,7 @@
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1340, 420]
+      "position": [2440, 300]
     },
     {
       "parameters": {
@@ -148,31 +148,24 @@
       "name": "Responder Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [900, 900]
+      "position": [900, 500]
     }
   ],
   "connections": {
     "Webhook Dashboard": {"main": [[{"node": "Validar Token", "type": "main", "index": 0}]]},
-    "Validar Token": {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
+    "Validar Token":     {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
     "¿Válido?": {
       "main": [
-        [
-          {"node": "Query KPIs", "type": "main", "index": 0},
-          {"node": "Query Diario", "type": "main", "index": 0},
-          {"node": "Query Agentes", "type": "main", "index": 0},
-          {"node": "Query Trivias", "type": "main", "index": 0},
-          {"node": "Query Velocidad", "type": "main", "index": 0},
-          {"node": "Query Ranking", "type": "main", "index": 0}
-        ],
+        [{"node": "Query KPIs", "type": "main", "index": 0}],
         [{"node": "Responder Error", "type": "main", "index": 0}]
       ]
     },
-    "Query KPIs": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
-    "Query Diario": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
-    "Query Agentes": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
-    "Query Trivias": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
-    "Query Velocidad": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
-    "Query Ranking": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Query KPIs":      {"main": [[{"node": "Query Diario",   "type": "main", "index": 0}]]},
+    "Query Diario":    {"main": [[{"node": "Query Agentes",  "type": "main", "index": 0}]]},
+    "Query Agentes":   {"main": [[{"node": "Query Trivias",  "type": "main", "index": 0}]]},
+    "Query Trivias":   {"main": [[{"node": "Query Velocidad","type": "main", "index": 0}]]},
+    "Query Velocidad": {"main": [[{"node": "Query Ranking",  "type": "main", "index": 0}]]},
+    "Query Ranking":   {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
     "Construir Respuesta": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
   },
   "settings": {"executionOrder": "v1"},

@@ -390,7 +390,7 @@ function renderRankingTable() {
     const pos = i + 1;
     const badge = pos === 1 ? 'badge-gold' : pos === 2 ? 'badge-silver' : pos === 3 ? 'badge-bronze' : '';
     const posLabel = badge ? `<span class="${badge}">${pos}°</span>` : `<span class="rank-num">${pos}°</span>`;
-    const vel = r.avg_speed_seconds ? `${Math.round(r.avg_speed_seconds/60)}m` : '—';
+    const vel = r.avg_speed_seconds ? `${(r.avg_speed_seconds/60).toFixed(1)} min` : '—';
     return `<tr>
       <td>${posLabel}</td>
       <td><strong>${r.name}</strong></td>

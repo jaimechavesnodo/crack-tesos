@@ -148,28 +148,24 @@
       <div class="step" id="step3"><div class="step-num">3</div> Confirmar</div>
     </div>
 
-    <div class="section-title">Archivo de participantes</div>
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Archivo de participantes</span>
+      <button class="btn btn-secondary" onclick="downloadTemplate()" style="width:auto;padding:8px 16px;font-size:12px">⬇️ Descargar plantilla</button>
+    </div>
     <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
       <div class="icon">📁</div>
       <p>Haz clic o arrastra aquí el archivo <strong>Excel (.xlsx) o CSV</strong></p>
-      <p style="font-size:12px; margin-top:6px; color:#aaa">Debe incluir: número de documento (columna principal) y teléfono (columna secundaria)</p>
+      <p style="font-size:12px; margin-top:6px; color:#aaa">Columnas requeridas: <strong>document_id</strong> · <strong>phone</strong> · <strong>number_of_codes</strong></p>
+      <p style="font-size:11px; margin-top:4px; color:#bbb">El multiplicador se calcula automáticamente: 15-29 códigos=x2, 30-44=x3, 45-59=x4…</p>
     </div>
     <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(event)">
 
     <div class="section-title" style="margin-top:20px">Configuración</div>
-    <div class="config-row">
+    <div class="config-row" style="grid-template-columns:1fr">
       <div class="form-group">
         <label>Número de trivia</label>
         <select id="triviaSelect">
           <option value="">Cargando trivias...</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Multiplicador a aplicar</label>
-        <select id="multiplierSelect">
-          <option value="2">x2 — Doble de goles</option>
-          <option value="3">x3 — Triple de goles</option>
-          <option value="4">x4 — Cuádruple de goles</option>
         </select>
       </div>
     </div>
@@ -349,21 +345,23 @@ function processFile(file) {
 
       if (raw.length === 0) { showError('uploadError', 'El archivo está vacío.'); return; }
 
-      // Detectar columnas de documento y teléfono
-      const headers = Object.keys(raw[0]).map(h => h.toLowerCase());
-      const docCol = Object.keys(raw[0]).find(h => /document|cedula|cédula|doc|identificacion|nro/i.test(h));
+      // Detectar columnas
+      const docCol   = Object.keys(raw[0]).find(h => /document|cedula|cédula|doc|identificacion|nro/i.test(h));
       const phoneCol = Object.keys(raw[0]).find(h => /phone|telefono|teléfono|celular|movil|móvil/i.test(h));
-      const nameCol = Object.keys(raw[0]).find(h => /nombre|name/i.test(h));
+      const codesCol = Object.keys(raw[0]).find(h => /codes|codigos|códigos|number_of|cantidad/i.test(h));
+
+      if (!codesCol) { showError('uploadError', 'El archivo no tiene la columna de códigos (number_of_codes). Descarga la plantilla.'); return; }
 
       state.fileData = raw.map(row => ({
         document_id: docCol ? String(row[docCol] || '').replace('.0','').trim() : '',
         phone: phoneCol ? String(row[phoneCol] || '').replace('.0','').trim() : '',
-        name: nameCol ? String(row[nameCol] || '').trim() : ''
+        number_of_codes: parseInt(String(row[codesCol] || '0').replace('.0','')) || 0
       })).filter(r => r.document_id || r.phone);
 
+      const conCodigos = state.fileData.filter(r => r.number_of_codes >= 15).length;
       const area = document.getElementById('uploadArea');
       area.classList.add('file-selected');
-      area.innerHTML = `<div class="icon">✅</div><p><strong>${file.name}</strong></p><p>${state.fileData.length} registros detectados</p>`;
+      area.innerHTML = `<div class="icon">✅</div><p><strong>${file.name}</strong></p><p>${state.fileData.length} registros · <strong>${conCodigos} con ≥15 códigos</strong> (aplican multiplicador)</p>`;
 
       document.getElementById('btnPreview').disabled = false;
     } catch(err) {
@@ -379,11 +377,10 @@ async function doPreview() {
   const triviaSelect = document.getElementById('triviaSelect');
   const triviaId = triviaSelect.value;
   const triviaNumber = triviaSelect.options[triviaSelect.selectedIndex]?.dataset.number;
-  const multiplier = parseFloat(document.getElementById('multiplierSelect').value);
 
   if (!triviaId) { showError('uploadError', 'Selecciona una trivia.'); return; }
 
-  setLoading('Consultando base de datos y generando vista previa...');
+  setLoading('Calculando multiplicadores y generando vista previa...');
 
   try {
     const res = await fetch(API.preview, {
@@ -392,7 +389,6 @@ async function doPreview() {
       body: JSON.stringify({
         trivia_id: triviaId,
         trivia_number: parseInt(triviaNumber),
-        multiplier,
         records: state.fileData,
         operator_email: state.email,
         source_file: state.fileName
@@ -426,6 +422,8 @@ function renderPreview(data) {
     <tr>
       <td>${r.nombre}</td>
       <td>${r.cedula}</td>
+      <td style="text-align:center">${r.codigos}</td>
+      <td style="text-align:center"><strong>${r.multiplicador}</strong></td>
       <td><span class="badge-goles">${r.goles_actuales_trivia} ⚽</span></td>
       <td><span class="badge-nuevos">+${r.goles_a_agregar} → ${r.goles_nuevos_trivia} ⚽</span></td>
       <td>${r.ya_aplicado !== 'No' ? `<span class="badge-warn">${r.ya_aplicado}</span>` : '✅'}</td>
@@ -451,23 +449,36 @@ function renderPreview(data) {
       <div class="table-scroll">
         <table>
           <thead><tr>
-            <th>Nombre</th><th>Cédula</th><th>Goles actuales</th><th>Después del multiplicador</th><th>Estado</th>
+            <th>Nombre</th><th>Cédula</th><th>Códigos</th><th>Multiplicador</th><th>Goles actuales</th><th>Después del x</th><th>Estado</th>
           </tr></thead>
-          <tbody>${tableRows.length > 0 ? tableRows : '<tr><td colspan="5" style="text-align:center; color:#888; padding:24px;">Ningún participante del archivo respondió correctamente esta trivia.</td></tr>'}</tbody>
+          <tbody>${tableRows.length > 0 ? tableRows : '<tr><td colspan="7" style="text-align:center; color:#888; padding:24px;">Ningún participante del archivo respondió correctamente esta trivia o no tiene ≥15 códigos.</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
 
-  // Mostrar sección de confirmación
   const confirmSection = document.getElementById('confirmSection');
   if (s.total_elegibles > 0) {
     const t = data.trivia_number || '';
     document.getElementById('confirmText').textContent =
-      `Se aplicará el multiplicador x${data.multiplier} a ${s.total_elegibles} participante(s) de la Trivia #${t}. Se agregarán ${s.total_goles_a_agregar} Goles en total.`;
+      `Se aplicarán multiplicadores automáticos (por rangos de códigos) a ${s.total_elegibles} participante(s) de la Trivia #${t}. Se agregarán ${s.total_goles_a_agregar} Goles en total.`;
     confirmSection.style.display = 'block';
   } else {
     confirmSection.style.display = 'none';
   }
+}
+
+// ========== PLANTILLA DESCARGABLE ==========
+function downloadTemplate() {
+  const ws_data = [
+    ['document_id', 'phone', 'number_of_codes'],
+    ['1234567890', '573001234567', 35],
+    ['0987654321', '573009876543', 62]
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  ws['!cols'] = [{wch:18},{wch:18},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Plantilla');
+  XLSX.writeFile(wb, 'plantilla_multiplicadores_crack_tesos.xlsx');
 }
 
 // ========== APPLY ==========

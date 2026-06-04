@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const token = $input.first().json.headers['x-wati-token'];\nif (!token || token !== 'CrackTesos2026_WH_Token') {\n  return [{json: {ok: 'false', mensaje: 'No autorizado'}}];\n}\nconst body = $input.first().json.body;\nlet phone = (body.phone || '').toString().replace(/[^0-9]/g, '');\nif (!phone.startsWith('57') && phone.length === 10) phone = '57' + phone;\nif (!phone || phone.length < 10) {\n  return [{json: {ok: 'false', mensaje: 'Teléfono inválido'}}];\n}\nconst name = (body.name || '').trim();\nif (!name) {\n  return [{json: {ok: 'false', mensaje: 'Nombre requerido'}}];\n}\nconst termsAccepted = body.terms_accepted === true || body.terms_accepted === 'true';\nreturn [{json: {\n  ok: 'true',\n  phone,\n  name,\n  document_id: body.document_id || null,\n  terms_accepted: termsAccepted ? 'true' : 'false'\n}}];"
+        "jsCode": "// Registro simplificado: solo requiere teléfono (sin nombre/cédula/T&C)\nconst token = $input.first().json.headers['x-wati-token'];\nif (!token || token !== 'CrackTesos2026_WH_Token') {\n  return [{json: {ok: 'false', mensaje: 'No autorizado'}}];\n}\nconst body = $input.first().json.body;\nlet phone = (body.phone || '').toString().replace(/[^0-9]/g, '');\nif (!phone.startsWith('57') && phone.length === 10) phone = '57' + phone;\nif (!phone || phone.length < 10) {\n  return [{json: {ok: 'false', mensaje: 'Teléfono inválido'}}];\n}\nreturn [{json: {\n  ok: 'true',\n  phone\n}}];"
       },
       "id": "validate",
       "name": "Validar",
@@ -42,7 +42,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO ct_users (phone, name, document_id, registered, terms_at, source)\nVALUES (\n  '{{ $json.phone }}',\n  '{{ $json.name }}',\n  NULLIF('{{ $json.document_id }}', 'null'),\n  '{{ $json.terms_accepted }}' = 'true',\n  CASE WHEN '{{ $json.terms_accepted }}' = 'true' THEN NOW() ELSE NULL END,\n  'whatsapp'\n)\nON CONFLICT (phone) DO UPDATE SET\n  name = CASE WHEN '{{ $json.name }}' <> '' THEN '{{ $json.name }}' ELSE ct_users.name END,\n  document_id = CASE WHEN NULLIF('{{ $json.document_id }}', 'null') IS NOT NULL\n    THEN NULLIF('{{ $json.document_id }}', 'null') ELSE ct_users.document_id END,\n  registered = CASE WHEN '{{ $json.terms_accepted }}' = 'true' THEN true ELSE ct_users.registered END,\n  terms_at = CASE WHEN '{{ $json.terms_accepted }}' = 'true' AND ct_users.registered = false THEN NOW() ELSE ct_users.terms_at END,\n  updated_at = NOW()\nRETURNING user_id, name, registered, total_goals",
+        "query": "INSERT INTO ct_users (phone, source, registered)\nVALUES ('{{ $json.phone }}', 'whatsapp_flow', false)\nON CONFLICT (phone) DO UPDATE SET\n  updated_at = NOW()\nRETURNING user_id, name, total_goals",
         "options": {}
       },
       "id": "upsert",
@@ -54,7 +54,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const validated = $('Validar').first().json;\nconst row = $input.first().json;\nreturn [{json: {\n  ok: 'true',\n  status: 'ok',\n  action: 'registered',\n  name: row.name || validated.name,\n  total_goles: String(row.total_goals || 0),\n  mensaje: `¡Listo! Registro completado.`\n}}];"
+        "jsCode": "const row = $input.first().json;\nreturn [{json: {\n  ok: 'true',\n  status: 'ok',\n  action: 'registered'\n}}];"
       },
       "id": "build-ok",
       "name": "Respuesta OK",
