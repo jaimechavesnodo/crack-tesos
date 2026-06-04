@@ -42,7 +42,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO ct_multiplier_batches (trivia_id, trivia_number, multiplier, source_file, total_records_file, eligible_records, applied_records, status, applied_at, applied_by, ip_address)\nVALUES (\n  '{{ $json.trivia_id }}',\n  {{ $json.trivia_number }},\n  {{ $json.multiplier }},\n  '{{ $json.source_file }}',\n  {{ $json.eligible_users.length }},\n  {{ $json.eligible_users.length }},\n  0,\n  'preview',\n  NOW() AT TIME ZONE 'America/Bogota',\n  '{{ $json.operator_email }}',\n  'web-module'\n)\nRETURNING batch_id",
+        "query": "INSERT INTO ct_multiplier_batches (trivia_id, trivia_number, source_file, total_records_file, eligible_records, applied_records, status, applied_at, applied_by, ip_address)\nVALUES (\n  '{{ $json.trivia_id }}',\n  {{ $json.trivia_number }},\n  '{{ $json.source_file }}',\n  {{ $json.eligible_users.length }},\n  {{ $json.eligible_users.length }},\n  0,\n  'processing',\n  NOW() AT TIME ZONE 'America/Bogota',\n  '{{ $json.operator_email }}',\n  'web-module'\n)\nRETURNING batch_id",
         "options": {}
       },
       "id": "create-batch",
