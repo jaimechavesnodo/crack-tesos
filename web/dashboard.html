@@ -174,7 +174,7 @@
       <div class="kpi-grid" id="kpiGrid"></div>
       <div class="chart-grid">
         <div class="chart-box"><div class="chart-header"><h3>Respuestas correctas vs incorrectas</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuDonut')">⋮</button><div class="export-menu" id="menuDonut"><button onclick="exportChartPNG('chartDonut','correctas_vs_incorrectas');closeMenus()">📷 PNG</button><button onclick="exportDataCSV(getDonutData(),'correctas_incorrectas');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getDonutData(),'correctas_incorrectas');closeMenus()">📊 Excel</button></div></div></div><div class="chart-wrap"><canvas id="chartDonut"></canvas></div></div>
-        <div class="chart-box"><div class="chart-header"><h3>Distribución por bono de velocidad</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuSpeed')">⋮</button><div class="export-menu" id="menuSpeed"><button onclick="exportChartPNG('chartSpeed','velocidad');closeMenus()">📷 PNG</button><button onclick="exportDataCSV(getSpeedData(),'velocidad');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getSpeedData(),'velocidad');closeMenus()">📊 Excel</button></div></div></div><div class="chart-wrap"><canvas id="chartSpeed"></canvas></div></div>
+        <div class="chart-box"><div class="chart-header"><h3>Distribución por bono de velocidad</h3><select id="speedTriviaFilter" onchange="renderSpeed(this.value)" style="font-size:12px;border:1px solid #ddd;border-radius:6px;padding:3px 8px;color:#555;background:white;cursor:pointer"><option value="all">Todas las trivias</option></select><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuSpeed')">⋮</button><div class="export-menu" id="menuSpeed"><button onclick="exportChartPNG('chartSpeed','velocidad');closeMenus()">📷 PNG</button><button onclick="exportDataCSV(getSpeedData(),'velocidad');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getSpeedData(),'velocidad');closeMenus()">📊 Excel</button></div></div></div><div class="chart-wrap"><canvas id="chartSpeed"></canvas></div></div>
       </div>
     </div>
 
@@ -198,7 +198,7 @@
 
     <!-- AGENTS -->
     <div class="tab-content" id="tab-agents">
-      <div class="chart-box" style="margin-bottom:20px"><div class="chart-header"><h3>Goles acumulados por Agente Comercial</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuAgentsChart')">⋮</button><div class="export-menu" id="menuAgentsChart"><button onclick="exportChartPNG('chartAgents','goles_por_agente');closeMenus()">📷 PNG</button><button onclick="exportDataCSV(getAgentsData(),'agentes');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getAgentsData(),'agentes');closeMenus()">📊 Excel</button></div></div></div><div class="chart-wrap" style="height:350px"><canvas id="chartAgents"></canvas></div></div>
+      <div class="chart-box" style="margin-bottom:20px"><div class="chart-header"><h3>Goles acumulados por Agente Comercial</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuAgentsChart')">⋮</button><div class="export-menu" id="menuAgentsChart"><button onclick="exportChartPNG('chartAgents','goles_por_agente');closeMenus()">📷 PNG</button><button onclick="exportDataCSV(getAgentsData(),'agentes');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getAgentsData(),'agentes');closeMenus()">📊 Excel</button></div></div></div><div class="chart-wrap" style="height:420px"><canvas id="chartAgents"></canvas></div></div>
       <div class="table-box">
         <div class="table-header" style="display:flex;align-items:center;justify-content:space-between"><h3>Estadísticas por Agente Comercial</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuAgentsTable')">⋮</button><div class="export-menu" id="menuAgentsTable"><button onclick="exportDataCSV(getAgentsData(),'estadisticas_agentes');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getAgentsData(),'estadisticas_agentes');closeMenus()">📊 Excel</button><button onclick="exportTablePDF('agentsBody','agentes');closeMenus()">📑 PDF</button></div></div></div>
         <div class="table-scroll"><table><thead><tr><th>Agente</th><th>Participantes</th><th>Registrados</th><th>Goles ⚽</th><th>Respuestas</th><th>Correctas</th><th>Tasa acierto</th></tr></thead><tbody id="agentsBody"></tbody></table></div>
@@ -273,6 +273,7 @@ function renderAll() {
   const safe = (fn, name) => { try { fn(); } catch(e) { console.error('render error [' + name + ']:', e); } };
   safe(renderKPIs, 'KPIs');
   safe(renderDonut, 'Donut');
+  safe(populateSpeedFilter, 'SpeedFilter');
   safe(renderSpeed, 'Speed');
   safe(renderDaily, 'Daily');
   safe(renderTrivias, 'Trivias');
@@ -315,15 +316,29 @@ function renderDonut() {
   });
 }
 
-function renderSpeed() {
-  const sp = state.data.speed;
+function populateSpeedFilter() {
+  const sel = document.getElementById('speedTriviaFilter');
+  if (!sel) return;
+  const trivias = [...new Set((state.data.speed||[]).map(s => s.trivia_number).filter(Boolean))].sort((a,b)=>a-b);
+  sel.innerHTML = '<option value="all">Todas las trivias</option>' +
+    trivias.map(n => `<option value="${n}">Trivia ${n}</option>`).join('');
+}
+
+function renderSpeed(triviaFilter) {
+  const sp = state.data.speed || [];
+  const selected = triviaFilter && triviaFilter !== 'all' ? parseInt(triviaFilter) : null;
   const labels = ['0-5 min\n+50⚽','5-15 min\n+35⚽','15-30 min\n+25⚽','30min-6h\n+15⚽','6-24h\n+5⚽'];
-  const vals = [1,2,3,4,5].map(r => { const f = sp.find(s => parseInt(s.speed_range) === r); return f ? parseInt(f.cantidad) : 0; });
+  const vals = [1,2,3,4,5].map(range => {
+    const rows = selected
+      ? sp.filter(s => parseInt(s.trivia_number) === selected && parseInt(s.speed_range) === range)
+      : sp.filter(s => parseInt(s.speed_range) === range);
+    return rows.reduce((acc, s) => acc + parseInt(s.cantidad||0), 0);
+  });
   destroyChart('speed');
   charts.speed = new Chart(document.getElementById('chartSpeed'), {
     type: 'bar',
     data: { labels, datasets: [{label: 'Respuestas correctas', data: vals, backgroundColor: ['#2d6a4f','#52b788','#74c69d','#95d5b2','#b7e4c7'], borderRadius:6}] },
-    options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+    options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{stepSize:1, precision:0}}}}
   });
 }
 
@@ -373,7 +388,10 @@ function renderAgentChart() {
       responsive:true, maintainAspectRatio:false,
       indexAxis:'y',
       plugins:{legend:{display:false}},
-      scales:{x:{beginAtZero:true}}
+      scales:{
+        x:{beginAtZero:true},
+        y:{ticks:{font:{size:10}, autoSkip:false}}
+      }
     }
   });
 }

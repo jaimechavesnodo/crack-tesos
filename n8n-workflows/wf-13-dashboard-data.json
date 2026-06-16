@@ -12,7 +12,10 @@
       "name": "Webhook Dashboard",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -22,13 +25,30 @@
       "name": "Validar Token",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [460, 300]
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
-          "conditions": [{"id": "ok", "leftValue": "={{ $json.ok }}", "rightValue": "true", "operator": {"type": "string", "operation": "equals"}}],
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
           "combinator": "and"
         },
         "options": {}
@@ -37,7 +57,10 @@
       "name": "¿Válido?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [680, 300]
+      "position": [
+        680,
+        300
+      ]
     },
     {
       "parameters": {
@@ -49,8 +72,16 @@
       "name": "Query KPIs",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [900, 300],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-creds",
+          "name": "Supabase DB"
+        }
+      }
     },
     {
       "parameters": {
@@ -62,8 +93,16 @@
       "name": "Query Diario",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1120, 300],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [
+        1120,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-creds",
+          "name": "Supabase DB"
+        }
+      }
     },
     {
       "parameters": {
@@ -75,8 +114,16 @@
       "name": "Query Agentes",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1340, 300],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-creds",
+          "name": "Supabase DB"
+        }
+      }
     },
     {
       "parameters": {
@@ -88,44 +135,71 @@
       "name": "Query Trivias",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1560, 300],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [
+        1560,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-creds",
+          "name": "Supabase DB"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses WHERE is_correct = TRUE AND is_duplicate = FALSE AND speed_range > 0 GROUP BY speed_range ORDER BY speed_range",
+        "query": "SELECT trivia_number, speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses WHERE is_correct = TRUE AND is_duplicate = FALSE AND speed_range > 0 GROUP BY trivia_number, speed_range ORDER BY trivia_number, speed_range",
         "options": {}
       },
       "id": "q-speed",
       "name": "Query Velocidad",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1780, 300],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [
+        1780,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-creds",
+          "name": "Supabase DB"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status = 'active' ORDER BY rank_general ASC LIMIT 50",
+        "query": "SELECT rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status = 'active' ORDER BY total_goals DESC, avg_speed_seconds ASC NULLS LAST LIMIT 50",
         "options": {}
       },
       "id": "q-ranking",
       "name": "Query Ranking",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2000, 300],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [
+        2000,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-creds",
+          "name": "Supabase DB"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "// Cada query puede ejecutarse múltiples veces por la cadena secuencial.\n// Deduplicamos por clave primaria para obtener solo valores únicos.\n\nconst kpis = $('Query KPIs').first().json;\n\n// Dedup por día\nconst dailyMap = {};\n$('Query Diario').all().forEach(i => { const r = i.json; if (r.dia && !dailyMap[r.dia]) dailyMap[r.dia] = r; });\nconst daily = Object.values(dailyMap).sort((a,b) => String(a.dia).localeCompare(String(b.dia)));\n\n// Dedup por agente\nconst agentsMap = {};\n$('Query Agentes').all().forEach(i => { const r = i.json; if (r.agent_name && !agentsMap[r.agent_name]) agentsMap[r.agent_name] = r; });\nconst agents = Object.values(agentsMap).sort((a,b) => (b.goles||0)-(a.goles||0));\n\n// Dedup por trivia_number\nconst triviasMap = {};\n$('Query Trivias').all().forEach(i => { const r = i.json; if (r.trivia_number && !triviasMap[r.trivia_number]) triviasMap[r.trivia_number] = r; });\nconst trivias = Object.values(triviasMap).sort((a,b) => a.trivia_number - b.trivia_number);\n\n// Dedup por speed_range\nconst speedMap = {};\n$('Query Velocidad').all().forEach(i => { const r = i.json; if (r.speed_range && !speedMap[r.speed_range]) speedMap[r.speed_range] = r; });\nconst speed = Object.values(speedMap).sort((a,b) => a.speed_range - b.speed_range);\n\n// Dedup por user_id para ranking\nconst rankingMap = {};\n$('Query Ranking').all().forEach(i => { const r = i.json; if (r.name && !rankingMap[r.name]) rankingMap[r.name] = r; });\nconst ranking = Object.values(rankingMap).sort((a,b) => (a.rank_general||999)-(b.rank_general||999));\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis,\n  daily,\n  agents,\n  trivias,\n  speed,\n  ranking\n}}];"
+        "jsCode": "// Cada query puede ejecutarse múltiples veces por la cadena secuencial.\n// Deduplicamos por clave primaria para obtener solo valores únicos.\n\nconst kpis = $('Query KPIs').first().json;\n\n// Dedup por día\nconst dailyMap = {};\n$('Query Diario').all().forEach(i => { const r = i.json; if (r.dia && !dailyMap[r.dia]) dailyMap[r.dia] = r; });\nconst daily = Object.values(dailyMap).sort((a,b) => String(a.dia).localeCompare(String(b.dia)));\n\n// Dedup por agente\nconst agentsMap = {};\n$('Query Agentes').all().forEach(i => { const r = i.json; if (r.agent_name && !agentsMap[r.agent_name]) agentsMap[r.agent_name] = r; });\nconst agents = Object.values(agentsMap).sort((a,b) => (b.goles||0)-(a.goles||0));\n\n// Dedup por trivia_number\nconst triviasMap = {};\n$('Query Trivias').all().forEach(i => { const r = i.json; if (r.trivia_number && !triviasMap[r.trivia_number]) triviasMap[r.trivia_number] = r; });\nconst trivias = Object.values(triviasMap).sort((a,b) => a.trivia_number - b.trivia_number);\n\n// Dedup por trivia_number + speed_range\nconst speedMap = {};\n$('Query Velocidad').all().forEach(i => { const r = i.json; const key = `${r.trivia_number}-${r.speed_range}`; if (r.speed_range && !speedMap[key]) speedMap[key] = r; });\nconst speed = Object.values(speedMap).sort((a,b) => a.trivia_number - b.trivia_number || a.speed_range - b.speed_range);\n\n// Dedup por user_id para ranking\nconst rankingMap = {};\n$('Query Ranking').all().forEach(i => { const r = i.json; if (r.name && !rankingMap[r.name]) rankingMap[r.name] = r; });\nconst ranking = Object.values(rankingMap).sort((a,b) => {\n  const goalsDiff = (b.total_goals||0) - (a.total_goals||0);\n  if (goalsDiff !== 0) return goalsDiff;\n  return (parseFloat(a.avg_speed_seconds)||999999) - (parseFloat(b.avg_speed_seconds)||999999);\n});\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis,\n  daily,\n  agents,\n  trivias,\n  speed,\n  ranking\n}}];"
       },
       "id": "build",
       "name": "Construir Respuesta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2220, 300]
+      "position": [
+        2220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -136,7 +210,10 @@
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2440, 300]
+      "position": [
+        2440,
+        300
+      ]
     },
     {
       "parameters": {
@@ -148,26 +225,140 @@
       "name": "Responder Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [900, 500]
+      "position": [
+        900,
+        500
+      ]
     }
   ],
   "connections": {
-    "Webhook Dashboard": {"main": [[{"node": "Validar Token", "type": "main", "index": 0}]]},
-    "Validar Token":     {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
-    "¿Válido?": {
+    "Webhook Dashboard": {
       "main": [
-        [{"node": "Query KPIs", "type": "main", "index": 0}],
-        [{"node": "Responder Error", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Validar Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Query KPIs":      {"main": [[{"node": "Query Diario",   "type": "main", "index": 0}]]},
-    "Query Diario":    {"main": [[{"node": "Query Agentes",  "type": "main", "index": 0}]]},
-    "Query Agentes":   {"main": [[{"node": "Query Trivias",  "type": "main", "index": 0}]]},
-    "Query Trivias":   {"main": [[{"node": "Query Velocidad","type": "main", "index": 0}]]},
-    "Query Velocidad": {"main": [[{"node": "Query Ranking",  "type": "main", "index": 0}]]},
-    "Query Ranking":   {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
-    "Construir Respuesta": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+    "Validar Token": {
+      "main": [
+        [
+          {
+            "node": "¿Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Válido?": {
+      "main": [
+        [
+          {
+            "node": "Query KPIs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query KPIs": {
+      "main": [
+        [
+          {
+            "node": "Query Diario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Diario": {
+      "main": [
+        [
+          {
+            "node": "Query Agentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Agentes": {
+      "main": [
+        [
+          {
+            "node": "Query Trivias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Trivias": {
+      "main": [
+        [
+          {
+            "node": "Query Velocidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Velocidad": {
+      "main": [
+        [
+          {
+            "node": "Query Ranking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Ranking": {
+      "main": [
+        [
+          {
+            "node": "Construir Respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir Respuesta": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": {"executionOrder": "v1"},
-  "tags": [{"name": "crack-tesos"}, {"name": "dashboard"}]
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "crack-tesos"
+    },
+    {
+      "name": "dashboard"
+    }
+  ]
 }
