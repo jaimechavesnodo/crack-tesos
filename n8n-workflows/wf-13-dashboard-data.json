@@ -170,7 +170,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status = 'active' ORDER BY total_goals DESC, avg_speed_seconds ASC NULLS LAST LIMIT 50",
+        "query": "SELECT rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status = 'active' AND total_responses > 0 ORDER BY total_goals DESC, avg_speed_seconds ASC NULLS LAST",
         "options": {}
       },
       "id": "q-ranking",

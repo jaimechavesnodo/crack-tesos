@@ -191,7 +191,7 @@
         <select id="agentFilter" onchange="renderRankingTable()"><option value="">Todos los participantes</option></select>
       </div>
       <div class="table-box">
-        <div class="table-header" style="display:flex;align-items:center;justify-content:space-between"><h3 id="rankingTitle">Ranking General — Top 50</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuRanking')">⋮</button><div class="export-menu" id="menuRanking"><button onclick="exportDataCSV(getRankingData(),'ranking');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getRankingData(),'ranking');closeMenus()">📊 Excel</button><button onclick="exportTablePDF('rankingBody','ranking');closeMenus()">📑 PDF</button></div></div></div>
+        <div class="table-header" style="display:flex;align-items:center;justify-content:space-between"><h3 id="rankingTitle">Ranking General</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuRanking')">⋮</button><div class="export-menu" id="menuRanking"><button onclick="exportDataCSV(getRankingData(),'ranking');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getRankingData(),'ranking');closeMenus()">📊 Excel</button><button onclick="exportTablePDF('rankingBody','ranking');closeMenus()">📑 PDF</button></div></div></div>
         <div class="table-scroll"><table><thead><tr><th>#</th><th>Participante</th><th>Agente</th><th>Goles ⚽</th><th>Correctas ✅</th><th>Respondidas</th><th>Vel. prom.</th></tr></thead><tbody id="rankingBody"></tbody></table></div>
       </div>
     </div>
