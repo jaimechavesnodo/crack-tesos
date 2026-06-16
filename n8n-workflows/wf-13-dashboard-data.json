@@ -149,7 +149,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT trivia_number, speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses WHERE is_correct = TRUE AND is_duplicate = FALSE AND speed_range > 0 GROUP BY trivia_number, speed_range ORDER BY trivia_number, speed_range",
+        "query": "SELECT t.trivia_number, r.speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses r JOIN ct_trivias t ON r.trivia_id = t.trivia_id WHERE r.is_correct = TRUE AND r.is_duplicate = FALSE AND r.speed_range > 0 GROUP BY t.trivia_number, r.speed_range ORDER BY t.trivia_number, r.speed_range",
         "options": {}
       },
       "id": "q-speed",
