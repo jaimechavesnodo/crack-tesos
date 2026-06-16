@@ -107,7 +107,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT u.agent_name, COUNT(DISTINCT u.user_id) AS participantes, COUNT(DISTINCT CASE WHEN u.registered THEN u.user_id END) AS registrados, COALESCE(SUM(u.total_goals), 0) AS goles, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_users u LEFT JOIN ct_trivia_responses r ON u.user_id = r.user_id AND r.is_duplicate = FALSE WHERE u.status = 'active' AND u.agent_name IS NOT NULL GROUP BY u.agent_name ORDER BY goles DESC",
+        "query": "SELECT u.agent_name, COUNT(DISTINCT u.user_id) AS participantes, COUNT(DISTINCT r.user_id) AS registrados, COALESCE(SUM(u.total_goals), 0) AS goles, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_users u LEFT JOIN ct_trivia_responses r ON u.user_id = r.user_id AND r.is_duplicate = FALSE WHERE u.status = 'active' AND u.agent_name IS NOT NULL GROUP BY u.agent_name ORDER BY goles DESC",
         "options": {}
       },
       "id": "q-agents",
