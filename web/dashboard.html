@@ -423,7 +423,7 @@ function renderRankingTable() {
   const filter = document.getElementById('agentFilter').value;
   let data = filterRanking(state.data.ranking);
   if (filter) data = data.filter(r => r.agent_name === filter);
-  document.getElementById('rankingTitle').textContent = filter ? `Ranking — ${filter}` : 'Ranking General — Top 50';
+  document.getElementById('rankingTitle').textContent = filter ? `Ranking — ${filter}` : 'Ranking General';
   document.getElementById('rankingBody').innerHTML = data.map((r, i) => {
     const pos = i + 1;
     const badge = pos === 1 ? 'badge-gold' : pos === 2 ? 'badge-silver' : pos === 3 ? 'badge-bronze' : '';
