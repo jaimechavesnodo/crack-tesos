@@ -287,15 +287,22 @@ function renderAll() {
 // ========== KPIs ==========
 function renderKPIs() {
   const k = state.data.kpis;
-  const tasa = k.total_respuestas > 0 ? Math.round(k.correctas / k.total_respuestas * 100) : 0;
-  const regRate = k.total_usuarios > 0 ? Math.round(k.registrados / k.total_usuarios * 100) : 0;
+  const excl = state.excludePruebas;
+  const total_usuarios  = k.total_usuarios  - (excl ? (k.pruebas_usuarios||0)   : 0);
+  const registrados     = k.registrados     - (excl ? (k.pruebas_registrados||0): 0);
+  const activos         = k.activos         - (excl ? (k.pruebas_activos||0)    : 0);
+  const total_respuestas= k.total_respuestas- (excl ? (k.pruebas_respuestas||0) : 0);
+  const correctas       = k.correctas       - (excl ? (k.pruebas_correctas||0)  : 0);
+  const goles_totales   = k.goles_totales   - (excl ? (k.pruebas_goles||0)      : 0);
+  const tasa    = total_respuestas > 0 ? Math.round(correctas / total_respuestas * 100) : 0;
+  const regRate = total_usuarios   > 0 ? Math.round(registrados / total_usuarios * 100) : 0;
   document.getElementById('kpiGrid').innerHTML = `
-    <div class="kpi blue"><div class="val">${k.total_usuarios}</div><div class="lbl">Participantes en base</div></div>
-    <div class="kpi green"><div class="val">${k.registrados}</div><div class="lbl">Registrados</div><div class="sub">${regRate}% de la base</div></div>
-    <div class="kpi"><div class="val">${k.activos}</div><div class="lbl">Han participado</div></div>
-    <div class="kpi"><div class="val">${k.total_respuestas}</div><div class="lbl">Respuestas totales</div></div>
-    <div class="kpi green"><div class="val">${tasa}%</div><div class="lbl">Tasa de acierto</div><div class="sub">${k.correctas} correctas</div></div>
-    <div class="kpi red"><div class="val">${Number(k.goles_totales).toLocaleString()}</div><div class="lbl">Goles acumulados ⚽</div></div>
+    <div class="kpi blue"><div class="val">${total_usuarios}</div><div class="lbl">Participantes en base</div></div>
+    <div class="kpi green"><div class="val">${registrados}</div><div class="lbl">Registrados</div><div class="sub">${regRate}% de la base</div></div>
+    <div class="kpi"><div class="val">${activos}</div><div class="lbl">Han participado</div></div>
+    <div class="kpi"><div class="val">${total_respuestas}</div><div class="lbl">Respuestas totales</div></div>
+    <div class="kpi green"><div class="val">${tasa}%</div><div class="lbl">Tasa de acierto</div><div class="sub">${correctas} correctas</div></div>
+    <div class="kpi red"><div class="val">${Number(goles_totales).toLocaleString()}</div><div class="lbl">Goles acumulados ⚽</div></div>
     <div class="kpi"><div class="val">${k.trivias_enviadas}</div><div class="lbl">Trivias enviadas</div><div class="sub">${k.trivias_con_multiplicador} con multiplicador</div></div>
   `;
 }
@@ -305,12 +312,16 @@ function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete chart
 
 function renderDonut() {
   const k = state.data.kpis;
+  const excl = state.excludePruebas;
+  const correctas       = k.correctas        - (excl ? (k.pruebas_correctas||0)      : 0);
+  const incorrectas     = k.incorrectas      - (excl ? (k.pruebas_incorrectas||0)    : 0);
+  const fuera_de_tiempo = k.fuera_de_tiempo  - (excl ? (k.pruebas_fuera_de_tiempo||0): 0);
   destroyChart('donut');
   charts.donut = new Chart(document.getElementById('chartDonut'), {
     type: 'doughnut',
     data: {
       labels: ['Correctas', 'Incorrectas', 'Fuera de tiempo'],
-      datasets: [{data: [k.correctas, k.incorrectas, k.fuera_de_tiempo], backgroundColor: ['#2d6a4f','#e63946','#f4a261'], borderWidth: 2}]
+      datasets: [{data: [correctas, incorrectas, fuera_de_tiempo], backgroundColor: ['#2d6a4f','#e63946','#f4a261'], borderWidth: 2}]
     },
     options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}
   });
