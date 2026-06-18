@@ -86,7 +86,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_agg(t ORDER BY t.dia) AS data FROM (SELECT DATE(responded_at AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS respuestas, SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correctas FROM ct_trivia_responses WHERE is_duplicate = FALSE GROUP BY dia) t",
+        "query": "SELECT json_agg(t ORDER BY t.dia) AS data FROM (SELECT DATE(responded_at AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS respuestas, SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correctas FROM ct_trivia_responses WHERE is_duplicate=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS') GROUP BY dia) t",
         "options": {}
       },
       "id": "q-daily",
@@ -107,7 +107,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_agg(t ORDER BY t.goles DESC) AS data FROM (SELECT u.agent_name, COUNT(DISTINCT u.user_id) AS participantes, COUNT(DISTINCT r.user_id) AS registrados, COALESCE(SUM(u.total_goals), 0) AS goles, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_users u LEFT JOIN ct_trivia_responses r ON u.user_id = r.user_id AND r.is_duplicate = FALSE WHERE u.status = 'active' AND u.agent_name IS NOT NULL GROUP BY u.agent_name) t",
+        "query": "SELECT json_agg(t ORDER BY t.goles DESC) AS data FROM (SELECT u_agg.agent_name, u_agg.participantes, u_agg.goles, COALESCE(r_agg.registrados,0) AS registrados, COALESCE(r_agg.respuestas,0) AS respuestas, COALESCE(r_agg.correctas,0) AS correctas FROM (SELECT agent_name, COUNT(*) AS participantes, COALESCE(SUM(total_goals),0) AS goles FROM ct_users WHERE status='active' AND agent_name IS NOT NULL AND agent_name!='PRUEBAS' GROUP BY agent_name) u_agg LEFT JOIN (SELECT u.agent_name, COUNT(DISTINCT r.user_id) AS registrados, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_trivia_responses r JOIN ct_users u ON r.user_id=u.user_id WHERE r.is_duplicate=FALSE AND u.status='active' AND u.agent_name!='PRUEBAS' GROUP BY u.agent_name) r_agg ON u_agg.agent_name=r_agg.agent_name) t",
         "options": {}
       },
       "id": "q-agents",
@@ -149,7 +149,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_agg(t ORDER BY t.trivia_number, t.speed_range) AS data FROM (SELECT t.trivia_number, r.speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses r JOIN ct_trivias t ON r.trivia_id = t.trivia_id WHERE r.is_correct = TRUE AND r.is_duplicate = FALSE AND r.speed_range > 0 GROUP BY t.trivia_number, r.speed_range) t",
+        "query": "SELECT json_agg(t ORDER BY t.trivia_number, t.speed_range) AS data FROM (SELECT t.trivia_number, r.speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses r JOIN ct_trivias t ON r.trivia_id=t.trivia_id WHERE r.is_correct=TRUE AND r.is_duplicate=FALSE AND r.speed_range>0 AND r.user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS') GROUP BY t.trivia_number, r.speed_range) t",
         "options": {}
       },
       "id": "q-speed",
@@ -170,7 +170,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_agg(t ORDER BY t.total_goals DESC, t.avg_speed_seconds ASC NULLS LAST) AS data FROM (SELECT user_id, rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status = 'active' AND total_responses > 0) t",
+        "query": "SELECT json_agg(t ORDER BY t.total_goals DESC, t.avg_speed_seconds ASC NULLS LAST) AS data FROM (SELECT user_id, rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status='active' AND total_responses>0 AND agent_name!='PRUEBAS') t",
         "options": {}
       },
       "id": "q-ranking",
@@ -190,7 +190,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const kpis = $('Query KPIs').first().json;\n\nfunction parseData(nodeName) {\n  const raw = $(nodeName).first().json.data;\n  return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []);\n}\n\nconst daily = parseData('Query Diario').sort((a,b) => String(a.dia).localeCompare(String(b.dia)));\nconst agents = parseData('Query Agentes');\nconst trivias = parseData('Query Trivias');\nconst speed = parseData('Query Velocidad');\nconst ranking = parseData('Query Ranking').sort((a,b) => {\n  const goalsDiff = (b.total_goals||0) - (a.total_goals||0);\n  if (goalsDiff !== 0) return goalsDiff;\n  return (parseFloat(a.avg_speed_seconds)||999999) - (parseFloat(b.avg_speed_seconds)||999999);\n});\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis,\n  daily,\n  agents,\n  trivias,\n  speed,\n  ranking\n}}];"
+        "jsCode": "const kpis = $('Query KPIs').first().json;\n\nfunction parseData(nodeName) {\n  const raw = $(nodeName).first().json.data;\n  return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []);\n}\n\nconst daily = parseData('Query Diario').sort((a,b) => String(a.dia).localeCompare(String(b.dia)));\nconst agents = parseData('Query Agentes');\nconst trivias = parseData('Query Trivias');\nconst speed = parseData('Query Velocidad');\nconst ranking = parseData('Query Ranking').sort((a,b) => {\n  const goalsDiff = (b.total_goals||0) - (a.total_goals||0);\n  if (goalsDiff !== 0) return goalsDiff;\n  return (parseFloat(a.avg_speed_seconds)||999999) - (parseFloat(b.avg_speed_seconds)||999999);\n});\nconst deactivated = parseData('Query Desactivados');\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis, daily, agents, trivias, speed, ranking, deactivated\n}}];"
       },
       "id": "build",
       "name": "Construir Respuesta",
@@ -229,6 +229,27 @@
         900,
         500
       ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_agg(t ORDER BY t.total_goals DESC) AS data FROM (SELECT u.user_id, u.name, u.agent_name, u.phone, u.city, u.total_goals, u.updated_at AS deactivated_at, COALESCE(r.trivias_respondidas,0) AS trivias_respondidas, COALESCE(r.total_respuestas,0) AS total_respuestas, COALESCE(r.correctas,0) AS correctas FROM ct_users u LEFT JOIN (SELECT user_id, COUNT(DISTINCT trivia_id) AS trivias_respondidas, COUNT(*) AS total_respuestas, COUNT(CASE WHEN is_correct THEN 1 END) AS correctas FROM ct_trivia_responses WHERE is_duplicate=FALSE GROUP BY user_id) r ON u.user_id=r.user_id WHERE u.status='inactive' AND (u.agent_name IS NULL OR u.agent_name!='PRUEBAS')) t",
+        "options": {}
+      },
+      "id": "q-deactivated",
+      "name": "Query Desactivados",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2220,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "supabase-creds",
+          "name": "Supabase DB"
+        }
+      }
     }
   ],
   "connections": {
@@ -331,7 +352,7 @@
       "main": [
         [
           {
-            "node": "Construir Respuesta",
+            "node": "Query Desactivados",
             "type": "main",
             "index": 0
           }
@@ -345,6 +366,17 @@
             "node": "Responder",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Desactivados": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Construir Respuesta",
+            "type": "main"
           }
         ]
       ]

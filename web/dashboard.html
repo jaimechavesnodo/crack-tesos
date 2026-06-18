@@ -99,11 +99,8 @@
 
     /* Refresh */
     .refresh-bar{display:flex;align-items:center;gap:8px;font-size:12px;color:#888;margin-bottom:20px;flex-wrap:wrap}
-    /* Toggle PRUEBAS */
-    .toggle-pruebas{display:flex;align-items:center;gap:6px;font-size:12px;color:#666;padding:4px 10px;background:white;border:1.5px solid #e0e0e0;border-radius:20px;cursor:pointer;transition:all .2s}
-    .toggle-pruebas:hover{border-color:#e63946}
-    .toggle-pruebas.active{border-color:#e63946;color:#e63946;background:#fff5f5}
-    .toggle-pruebas input{cursor:pointer;accent-color:#e63946}
+    /* Desactivados tabla */
+    .badge-inactive{background:#fee2e2;color:#991b1b;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;white-space:nowrap}
     /* Menú exportar */
     .export-wrap{position:relative;display:inline-block}
     .export-btn{background:none;border:1px solid #e0e0e0;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;color:#666;transition:all .2s}
@@ -155,9 +152,6 @@
     <div class="refresh-bar">
       <div class="refresh-dot"></div>
       <span id="refreshLabel">Cargando datos...</span>
-      <label class="toggle-pruebas" id="togglePruebasBtn" onclick="togglePruebas()" title="Incluir/excluir agente PRUEBAS de todos los datos">
-        <input type="checkbox" id="chkPruebas" onclick="event.stopPropagation()"> Incluir PRUEBAS
-      </label>
       <button class="btn btn-sm" onclick="loadData()" style="margin-left:auto">↻ Actualizar</button>
     </div>
 
@@ -167,6 +161,7 @@
       <div class="tab" onclick="showTab('rankings')">🏆 Rankings</div>
       <div class="tab" onclick="showTab('agents')">🏢 Por Agente</div>
       <div class="tab" onclick="showTab('projection')">🔭 Proyección</div>
+      <div class="tab" onclick="showTab('deactivated')">🚫 Desactivados</div>
     </div>
 
     <!-- OVERVIEW -->
@@ -206,6 +201,16 @@
     </div>
 
     <!-- PROJECTION -->
+    <div class="tab-content" id="tab-deactivated">
+      <div class="table-header" style="display:flex;align-items:center;justify-content:space-between">
+        <h3>Usuarios Desactivados</h3>
+        <div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuDeactivated')">⋮</button><div class="export-menu" id="menuDeactivated"><button onclick="exportDataCSV(state.data?.deactivated||[],'desactivados');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(state.data?.deactivated||[],'desactivados');closeMenus()">📊 Excel</button></div></div>
+      </div>
+      <div class="table-wrap"><table><thead><tr>
+        <th>#</th><th>PARTICIPANTE</th><th>AGENTE</th><th>CIUDAD</th><th>TELÉFONO</th><th>GOLES ⚽</th><th>TRIVIAS RESP.</th><th>CORRECTAS ✅</th><th>RESPUESTAS</th><th>FECHA DESACT.</th>
+      </tr></thead><tbody id="deactivatedBody"></tbody></table></div>
+    </div>
+
     <div class="tab-content" id="tab-projection">
       <div class="proj-box">
         <h3>🔭 Modelo de Proyección de Participación</h3>
@@ -282,18 +287,18 @@ function renderAll() {
   safe(populateAgentFilter, 'AgentFilter');
   safe(renderRankingTable, 'RankingTable');
   safe(renderProjection, 'Projection');
+  safe(renderDesactivados, 'Desactivados');
 }
 
 // ========== KPIs ==========
 function renderKPIs() {
   const k = state.data.kpis;
-  const excl = state.excludePruebas;
-  const total_usuarios  = k.total_usuarios  - (excl ? (k.pruebas_usuarios||0)   : 0);
-  const registrados     = k.registrados     - (excl ? (k.pruebas_registrados||0): 0);
-  const activos         = k.activos         - (excl ? (k.pruebas_activos||0)    : 0);
-  const total_respuestas= k.total_respuestas- (excl ? (k.pruebas_respuestas||0) : 0);
-  const correctas       = k.correctas       - (excl ? (k.pruebas_correctas||0)  : 0);
-  const goles_totales   = k.goles_totales   - (excl ? (k.pruebas_goles||0)      : 0);
+  const total_usuarios   = k.total_usuarios   - (k.pruebas_usuarios||0);
+  const registrados      = k.registrados      - (k.pruebas_registrados||0);
+  const activos          = k.activos          - (k.pruebas_activos||0);
+  const total_respuestas = k.total_respuestas - (k.pruebas_respuestas||0);
+  const correctas        = k.correctas        - (k.pruebas_correctas||0);
+  const goles_totales    = k.goles_totales    - (k.pruebas_goles||0);
   const tasa    = total_respuestas > 0 ? Math.round(correctas / total_respuestas * 100) : 0;
   const regRate = total_usuarios   > 0 ? Math.round(registrados / total_usuarios * 100) : 0;
   document.getElementById('kpiGrid').innerHTML = `
@@ -312,10 +317,9 @@ function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete chart
 
 function renderDonut() {
   const k = state.data.kpis;
-  const excl = state.excludePruebas;
-  const correctas       = k.correctas        - (excl ? (k.pruebas_correctas||0)      : 0);
-  const incorrectas     = k.incorrectas      - (excl ? (k.pruebas_incorrectas||0)    : 0);
-  const fuera_de_tiempo = k.fuera_de_tiempo  - (excl ? (k.pruebas_fuera_de_tiempo||0): 0);
+  const correctas       = k.correctas       - (k.pruebas_correctas||0);
+  const incorrectas     = k.incorrectas     - (k.pruebas_incorrectas||0);
+  const fuera_de_tiempo = k.fuera_de_tiempo - (k.pruebas_fuera_de_tiempo||0);
   destroyChart('donut');
   charts.donut = new Chart(document.getElementById('chartDonut'), {
     type: 'doughnut',
@@ -555,26 +559,40 @@ function showTab(id) {
 }
 function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 5000); }
 
-// ========== TOGGLE PRUEBAS ==========
-state.excludePruebas = true; // Por defecto excluye PRUEBAS
-
-function togglePruebas() {
-  state.excludePruebas = !state.excludePruebas;
-  const chk = document.getElementById('chkPruebas');
-  const btn = document.getElementById('togglePruebasBtn');
-  chk.checked = !state.excludePruebas;
-  btn.classList.toggle('active', !state.excludePruebas);
-  if (state.data) renderAll();
-}
-
+// PRUEBAS siempre excluido a nivel de BD — no se necesita toggle
 function filterAgents(data) {
-  if (!state.excludePruebas) return data;
   return (data || []).filter(d => d.agent_name !== 'PRUEBAS' && d.agente !== 'PRUEBAS');
 }
-
 function filterRanking(data) {
-  if (!state.excludePruebas) return data;
   return (data || []).filter(d => d.agent_name !== 'PRUEBAS');
+}
+
+// ========== DESACTIVADOS ==========
+function renderDesactivados() {
+  const data = state.data.deactivated || [];
+  if (!data.length) {
+    document.getElementById('deactivatedBody').innerHTML =
+      '<tr><td colspan="10" style="text-align:center;color:#888;padding:24px">No hay usuarios desactivados</td></tr>';
+    return;
+  }
+  document.getElementById('deactivatedBody').innerHTML = data.map((u, i) => {
+    const fecha = u.deactivated_at
+      ? new Date(u.deactivated_at).toLocaleDateString('es-CO', {day:'2-digit',month:'short',year:'numeric'})
+      : '—';
+    const phone = u.phone ? String(u.phone).slice(-4).padStart(String(u.phone).length, '·') : '—';
+    return `<tr>
+      <td>${i+1}</td>
+      <td><strong>${u.name||'—'}</strong> <span class="badge-inactive">Inactivo</span></td>
+      <td>${u.agent_name||'—'}</td>
+      <td>${u.city||'—'}</td>
+      <td style="color:#999">${phone}</td>
+      <td><strong>${u.total_goals||0} ⚽</strong></td>
+      <td>${u.trivias_respondidas||0}</td>
+      <td>${u.correctas||0}</td>
+      <td>${u.total_respuestas||0}</td>
+      <td style="color:#999;font-size:12px">${fecha}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ========== MENÚS EXPORTAR ==========
