@@ -65,7 +65,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT\n  (SELECT COUNT(*) FROM ct_users WHERE status = 'active') AS total_usuarios,\n  (SELECT COUNT(*) FROM ct_users WHERE registered = true AND status = 'active') AS registrados,\n  (SELECT COUNT(DISTINCT user_id) FROM ct_trivia_responses WHERE is_duplicate = FALSE) AS activos,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_duplicate = FALSE) AS total_respuestas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct = TRUE AND is_duplicate = FALSE) AS correctas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct = FALSE AND is_duplicate = FALSE AND is_out_of_time = FALSE) AS incorrectas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_out_of_time = TRUE) AS fuera_de_tiempo,\n  (SELECT COALESCE(SUM(total_goals), 0) FROM ct_users WHERE status = 'active') AS goles_totales,\n  (SELECT COUNT(*) FROM ct_trivias WHERE status IN ('sent','closed','settled')) AS trivias_enviadas,\n  (SELECT COUNT(*) FROM ct_trivias WHERE has_multiplier = TRUE AND status IN ('sent','closed','settled')) AS trivias_con_multiplicador,\n  (SELECT COUNT(*) FROM ct_users u WHERE u.status = 'active' AND u.agent_name = 'PRUEBAS') AS pruebas_usuarios,\n  (SELECT COUNT(*) FROM ct_users u WHERE u.registered = TRUE AND u.status = 'active' AND u.agent_name = 'PRUEBAS') AS pruebas_registrados,\n  (SELECT COUNT(DISTINCT r.user_id) FROM ct_trivia_responses r JOIN ct_users u ON r.user_id = u.user_id WHERE r.is_duplicate = FALSE AND u.status = 'active' AND u.agent_name = 'PRUEBAS') AS pruebas_activos,\n  (SELECT COUNT(*) FROM ct_trivia_responses r JOIN ct_users u ON r.user_id = u.user_id WHERE r.is_duplicate = FALSE AND u.agent_name = 'PRUEBAS') AS pruebas_respuestas,\n  (SELECT COUNT(*) FROM ct_trivia_responses r JOIN ct_users u ON r.user_id = u.user_id WHERE r.is_correct = TRUE AND r.is_duplicate = FALSE AND u.agent_name = 'PRUEBAS') AS pruebas_correctas,\n  (SELECT COUNT(*) FROM ct_trivia_responses r JOIN ct_users u ON r.user_id = u.user_id WHERE r.is_correct = FALSE AND r.is_duplicate = FALSE AND r.is_out_of_time = FALSE AND u.agent_name = 'PRUEBAS') AS pruebas_incorrectas,\n  (SELECT COUNT(*) FROM ct_trivia_responses r JOIN ct_users u ON r.user_id = u.user_id WHERE r.is_out_of_time = TRUE AND u.agent_name = 'PRUEBAS') AS pruebas_fuera_de_tiempo,\n  (SELECT COALESCE(SUM(u.total_goals), 0) FROM ct_users u WHERE u.status = 'active' AND u.agent_name = 'PRUEBAS') AS pruebas_goles",
+        "query": "SELECT\n  (SELECT COUNT(*) FROM ct_users WHERE status = 'active') AS total_usuarios,\n  (SELECT COUNT(*) FROM ct_users WHERE registered = true AND status = 'active') AS registrados,\n  (SELECT COUNT(DISTINCT user_id) FROM ct_trivia_responses WHERE is_duplicate = FALSE) AS activos,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_duplicate = FALSE) AS total_respuestas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct = TRUE AND is_duplicate = FALSE) AS correctas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct = FALSE AND is_duplicate = FALSE AND is_out_of_time = FALSE) AS incorrectas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_out_of_time = TRUE) AS fuera_de_tiempo,\n  (SELECT COALESCE(SUM(total_goals), 0) FROM ct_users WHERE status = 'active') AS goles_totales,\n  (SELECT COUNT(*) FROM ct_trivias WHERE status IN ('sent','closed','settled')) AS trivias_enviadas,\n  (SELECT COUNT(*) FROM ct_trivias WHERE has_multiplier = TRUE AND status IN ('sent','closed','settled')) AS trivias_con_multiplicador,\n  (SELECT COUNT(*) FROM ct_users WHERE status = 'active' AND agent_name = 'PRUEBAS') AS pruebas_usuarios,\n  (SELECT COUNT(*) FROM ct_users WHERE registered = TRUE AND status = 'active' AND agent_name = 'PRUEBAS') AS pruebas_registrados,\n  (SELECT COALESCE(SUM(total_goals), 0) FROM ct_users WHERE status = 'active' AND agent_name = 'PRUEBAS') AS pruebas_goles,\n  (SELECT COUNT(DISTINCT user_id) FROM ct_trivia_responses WHERE is_duplicate = FALSE AND user_id IN (SELECT user_id FROM ct_users WHERE agent_name = 'PRUEBAS')) AS pruebas_activos,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_duplicate = FALSE AND user_id IN (SELECT user_id FROM ct_users WHERE agent_name = 'PRUEBAS')) AS pruebas_respuestas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct = TRUE AND is_duplicate = FALSE AND user_id IN (SELECT user_id FROM ct_users WHERE agent_name = 'PRUEBAS')) AS pruebas_correctas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct = FALSE AND is_duplicate = FALSE AND is_out_of_time = FALSE AND user_id IN (SELECT user_id FROM ct_users WHERE agent_name = 'PRUEBAS')) AS pruebas_incorrectas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_out_of_time = TRUE AND user_id IN (SELECT user_id FROM ct_users WHERE agent_name = 'PRUEBAS')) AS pruebas_fuera_de_tiempo",
         "options": {}
       },
       "id": "q-kpis",
@@ -86,7 +86,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT DATE(responded_at AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS respuestas, SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correctas FROM ct_trivia_responses WHERE is_duplicate = FALSE GROUP BY dia ORDER BY dia ASC",
+        "query": "SELECT json_agg(t ORDER BY t.dia) AS data FROM (SELECT DATE(responded_at AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS respuestas, SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correctas FROM ct_trivia_responses WHERE is_duplicate = FALSE GROUP BY dia) t",
         "options": {}
       },
       "id": "q-daily",
@@ -107,7 +107,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT u.agent_name, COUNT(DISTINCT u.user_id) AS participantes, COUNT(DISTINCT r.user_id) AS registrados, COALESCE(SUM(u.total_goals), 0) AS goles, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_users u LEFT JOIN ct_trivia_responses r ON u.user_id = r.user_id AND r.is_duplicate = FALSE WHERE u.status = 'active' AND u.agent_name IS NOT NULL GROUP BY u.agent_name ORDER BY goles DESC",
+        "query": "SELECT json_agg(t ORDER BY t.goles DESC) AS data FROM (SELECT u.agent_name, COUNT(DISTINCT u.user_id) AS participantes, COUNT(DISTINCT r.user_id) AS registrados, COALESCE(SUM(u.total_goals), 0) AS goles, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_users u LEFT JOIN ct_trivia_responses r ON u.user_id = r.user_id AND r.is_duplicate = FALSE WHERE u.status = 'active' AND u.agent_name IS NOT NULL GROUP BY u.agent_name) t",
         "options": {}
       },
       "id": "q-agents",
@@ -128,7 +128,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT t.trivia_number, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas, COUNT(CASE WHEN r.is_out_of_time THEN 1 END) AS fuera_tiempo, AVG(CASE WHEN r.is_correct THEN r.response_seconds END) AS avg_segundos FROM ct_trivias t LEFT JOIN ct_trivia_responses r ON t.trivia_id = r.trivia_id AND r.is_duplicate = FALSE WHERE t.status IN ('sent','closed','settled') GROUP BY t.trivia_number ORDER BY t.trivia_number",
+        "query": "SELECT json_agg(t ORDER BY t.trivia_number) AS data FROM (SELECT t.trivia_number, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas, COUNT(CASE WHEN r.is_out_of_time THEN 1 END) AS fuera_tiempo, AVG(CASE WHEN r.is_correct THEN r.response_seconds END) AS avg_segundos FROM ct_trivias t LEFT JOIN ct_trivia_responses r ON t.trivia_id = r.trivia_id AND r.is_duplicate = FALSE WHERE t.status IN ('sent','closed','settled') GROUP BY t.trivia_number) t",
         "options": {}
       },
       "id": "q-trivias",
@@ -149,7 +149,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT t.trivia_number, r.speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses r JOIN ct_trivias t ON r.trivia_id = t.trivia_id WHERE r.is_correct = TRUE AND r.is_duplicate = FALSE AND r.speed_range > 0 GROUP BY t.trivia_number, r.speed_range ORDER BY t.trivia_number, r.speed_range",
+        "query": "SELECT json_agg(t ORDER BY t.trivia_number, t.speed_range) AS data FROM (SELECT t.trivia_number, r.speed_range, COUNT(*) AS cantidad FROM ct_trivia_responses r JOIN ct_trivias t ON r.trivia_id = t.trivia_id WHERE r.is_correct = TRUE AND r.is_duplicate = FALSE AND r.speed_range > 0 GROUP BY t.trivia_number, r.speed_range) t",
         "options": {}
       },
       "id": "q-speed",
@@ -170,7 +170,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT user_id, rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status = 'active' AND total_responses > 0 ORDER BY total_goals DESC, avg_speed_seconds ASC NULLS LAST",
+        "query": "SELECT json_agg(t ORDER BY t.total_goals DESC, t.avg_speed_seconds ASC NULLS LAST) AS data FROM (SELECT user_id, rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status = 'active' AND total_responses > 0) t",
         "options": {}
       },
       "id": "q-ranking",
@@ -190,7 +190,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Cada query puede ejecutarse múltiples veces por la cadena secuencial.\n// Deduplicamos por clave primaria para obtener solo valores únicos.\n\nconst kpis = $('Query KPIs').first().json;\n\n// Dedup por día\nconst dailyMap = {};\n$('Query Diario').all().forEach(i => { const r = i.json; if (r.dia && !dailyMap[r.dia]) dailyMap[r.dia] = r; });\nconst daily = Object.values(dailyMap).sort((a,b) => String(a.dia).localeCompare(String(b.dia)));\n\n// Dedup por agente\nconst agentsMap = {};\n$('Query Agentes').all().forEach(i => { const r = i.json; if (r.agent_name && !agentsMap[r.agent_name]) agentsMap[r.agent_name] = r; });\nconst agents = Object.values(agentsMap).sort((a,b) => (b.goles||0)-(a.goles||0));\n\n// Dedup por trivia_number\nconst triviasMap = {};\n$('Query Trivias').all().forEach(i => { const r = i.json; if (r.trivia_number && !triviasMap[r.trivia_number]) triviasMap[r.trivia_number] = r; });\nconst trivias = Object.values(triviasMap).sort((a,b) => a.trivia_number - b.trivia_number);\n\n// Dedup por trivia_number + speed_range\nconst speedMap = {};\n$('Query Velocidad').all().forEach(i => { const r = i.json; const key = `${r.trivia_number}-${r.speed_range}`; if (r.speed_range && !speedMap[key]) speedMap[key] = r; });\nconst speed = Object.values(speedMap).sort((a,b) => a.trivia_number - b.trivia_number || a.speed_range - b.speed_range);\n\n// Dedup por user_id para ranking\nconst rankingMap = {};\n$('Query Ranking').all().forEach(i => { const r = i.json; if (r.user_id && !rankingMap[r.user_id]) rankingMap[r.user_id] = r; });\nconst ranking = Object.values(rankingMap).sort((a,b) => {\n  const goalsDiff = (b.total_goals||0) - (a.total_goals||0);\n  if (goalsDiff !== 0) return goalsDiff;\n  return (parseFloat(a.avg_speed_seconds)||999999) - (parseFloat(b.avg_speed_seconds)||999999);\n});\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis,\n  daily,\n  agents,\n  trivias,\n  speed,\n  ranking\n}}];"
+        "jsCode": "const kpis = $('Query KPIs').first().json;\n\nfunction parseData(nodeName) {\n  const raw = $(nodeName).first().json.data;\n  return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []);\n}\n\nconst daily = parseData('Query Diario').sort((a,b) => String(a.dia).localeCompare(String(b.dia)));\nconst agents = parseData('Query Agentes');\nconst trivias = parseData('Query Trivias');\nconst speed = parseData('Query Velocidad');\nconst ranking = parseData('Query Ranking').sort((a,b) => {\n  const goalsDiff = (b.total_goals||0) - (a.total_goals||0);\n  if (goalsDiff !== 0) return goalsDiff;\n  return (parseFloat(a.avg_speed_seconds)||999999) - (parseFloat(b.avg_speed_seconds)||999999);\n});\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  kpis,\n  daily,\n  agents,\n  trivias,\n  speed,\n  ranking\n}}];"
       },
       "id": "build",
       "name": "Construir Respuesta",
