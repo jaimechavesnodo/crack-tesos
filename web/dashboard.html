@@ -175,7 +175,7 @@
 
     <!-- PARTICIPATION -->
     <div class="tab-content" id="tab-participation">
-      <div class="chart-box" style="margin-bottom:20px"><div class="chart-header"><h3>Respuestas diarias</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuDaily')">⋮</button><div class="export-menu" id="menuDaily"><button onclick="exportChartPNG('chartDaily','respuestas_diarias');closeMenus()">📷 PNG</button><button onclick="exportDataCSV(getDailyData(),'respuestas_diarias');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getDailyData(),'respuestas_diarias');closeMenus()">📊 Excel</button></div></div></div><div class="chart-wrap" style="height:300px"><canvas id="chartDaily"></canvas></div></div>
+      <div class="chart-box" style="margin-bottom:20px"><div class="chart-header"><h3>Respuestas por Trivia</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuDaily')">⋮</button><div class="export-menu" id="menuDaily"><button onclick="exportChartPNG('chartDaily','respuestas_por_trivia');closeMenus()">📷 PNG</button><button onclick="exportDataCSV(getTriviaData(),'respuestas_por_trivia');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getTriviaData(),'respuestas_por_trivia');closeMenus()">📊 Excel</button></div></div></div><div class="chart-wrap" style="height:300px"><canvas id="chartDaily"></canvas></div></div>
       <div class="chart-box"><div class="chart-header"><h3>Participación por trivia</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuTrivias')">⋮</button><div class="export-menu" id="menuTrivias"><button onclick="exportChartPNG('chartTrivias','participacion_trivia');closeMenus()">📷 PNG</button><button onclick="exportDataCSV(getTriviaData(),'participacion_trivia');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getTriviaData(),'participacion_trivia');closeMenus()">📊 Excel</button></div></div></div><div class="chart-wrap" style="height:300px"><canvas id="chartTrivias"></canvas></div></div>
     </div>
 
@@ -358,15 +358,15 @@ function renderSpeed(triviaFilter) {
 }
 
 function renderDaily() {
-  const daily = state.data.daily;
+  const tr = state.data.trivias || [];
   destroyChart('daily');
   charts.daily = new Chart(document.getElementById('chartDaily'), {
     type: 'bar',
     data: {
-      labels: daily.map(d => { try { const p=String(d.dia).split('-'); const m=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return `${parseInt(p[2])} de ${m[parseInt(p[1])-1]}`; } catch(e){ return d.dia; } }),
+      labels: tr.map(t => `Trivia #${t.trivia_number}`),
       datasets: [
-        {label:'Respuestas totales', data: daily.map(d => d.respuestas), backgroundColor:'#0077b630', borderColor:'#0077b6', borderWidth:2, type:'bar'},
-        {label:'Correctas', data: daily.map(d => d.correctas), backgroundColor:'#2d6a4f', borderRadius:4, type:'bar'}
+        {label:'Respuestas totales', data: tr.map(t => (t.respuestas||0)), backgroundColor:'#0077b630', borderColor:'#0077b6', borderWidth:2, type:'bar'},
+        {label:'Correctas', data: tr.map(t => (t.correctas||0)), backgroundColor:'#2d6a4f', borderRadius:4, type:'bar'}
       ]
     },
     options: {responsive:true, maintainAspectRatio:false, scales:{x:{stacked:false},y:{beginAtZero:true}}, plugins:{legend:{position:'bottom'}}}

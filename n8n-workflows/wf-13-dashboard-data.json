@@ -128,7 +128,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_agg(t ORDER BY t.trivia_number) AS data FROM (SELECT t.trivia_number, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas, COUNT(CASE WHEN r.is_out_of_time THEN 1 END) AS fuera_tiempo, AVG(CASE WHEN r.is_correct THEN r.response_seconds END) AS avg_segundos FROM ct_trivias t LEFT JOIN ct_trivia_responses r ON t.trivia_id = r.trivia_id AND r.is_duplicate = FALSE WHERE t.status IN ('sent','closed','settled') GROUP BY t.trivia_number) t",
+        "query": "SELECT json_agg(t ORDER BY t.trivia_number) AS data FROM (SELECT t.trivia_number, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas, COUNT(CASE WHEN r.is_out_of_time THEN 1 END) AS fuera_tiempo, AVG(CASE WHEN r.is_correct THEN r.response_seconds END) AS avg_segundos FROM ct_trivias t LEFT JOIN ct_trivia_responses r ON t.trivia_id = r.trivia_id AND r.is_duplicate = FALSE AND r.user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS') WHERE t.status IN ('sent','closed','settled') GROUP BY t.trivia_number) t",
         "options": {}
       },
       "id": "q-trivias",
