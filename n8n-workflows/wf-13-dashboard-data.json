@@ -170,7 +170,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_agg(t ORDER BY t.total_goals DESC, t.avg_speed_seconds ASC NULLS LAST) AS data FROM (SELECT user_id, rank_general, name, agent_name, total_goals, correct_count, total_responses, avg_speed_seconds FROM v_ct_rankings WHERE status='active' AND total_responses>0 AND agent_name!='PRUEBAS') t",
+        "query": "SELECT json_agg(t ORDER BY t.total_goals DESC, t.avg_speed_seconds ASC NULLS LAST) AS data FROM (SELECT v.user_id, v.rank_general, v.name, v.agent_name, v.total_goals, v.correct_count, v.total_responses, v.avg_speed_seconds, (SELECT COALESCE(SUM(r.response_seconds),0) FROM ct_trivia_responses r WHERE r.user_id = v.user_id AND r.is_correct = TRUE AND r.is_duplicate = FALSE) AS total_speed_seconds FROM v_ct_rankings v WHERE v.status='active' AND v.total_responses>0 AND v.agent_name!='PRUEBAS') t",
         "options": {}
       },
       "id": "q-ranking",

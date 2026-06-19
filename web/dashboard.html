@@ -187,7 +187,7 @@
       </div>
       <div class="table-box">
         <div class="table-header" style="display:flex;align-items:center;justify-content:space-between"><h3 id="rankingTitle">Ranking General</h3><div class="export-wrap"><button class="export-btn" onclick="toggleMenu('menuRanking')">⋮</button><div class="export-menu" id="menuRanking"><button onclick="exportDataCSV(getRankingData(),'ranking');closeMenus()">📄 CSV</button><button onclick="exportDataExcel(getRankingData(),'ranking');closeMenus()">📊 Excel</button><button onclick="exportTablePDF('rankingBody','ranking');closeMenus()">📑 PDF</button></div></div></div>
-        <div class="table-scroll"><table><thead><tr><th>#</th><th>Participante</th><th>Agente</th><th>Goles ⚽</th><th>Correctas ✅</th><th>Respondidas</th><th>Vel. prom.</th></tr></thead><tbody id="rankingBody"></tbody></table></div>
+        <div class="table-scroll"><table><thead><tr><th>#</th><th>Participante</th><th>Agente</th><th>Goles ⚽</th><th>Correctas ✅</th><th>Respondidas</th><th>Vel. Prom.</th><th>Vel. Tot.</th></tr></thead><tbody id="rankingBody"></tbody></table></div>
       </div>
     </div>
 
@@ -443,7 +443,8 @@ function renderRankingTable() {
     const pos = i + 1;
     const badge = pos === 1 ? 'badge-gold' : pos === 2 ? 'badge-silver' : pos === 3 ? 'badge-bronze' : '';
     const posLabel = badge ? `<span class="${badge}">${pos}°</span>` : `<span class="rank-num">${pos}°</span>`;
-    const vel = r.avg_speed_seconds ? `${(r.avg_speed_seconds/60).toFixed(1)} min` : '—';
+    const vel    = fmtTime(r.avg_speed_seconds);
+    const velTot = fmtTime(r.total_speed_seconds);
     return `<tr>
       <td>${posLabel}</td>
       <td><strong>${r.name}</strong></td>
@@ -451,7 +452,8 @@ function renderRankingTable() {
       <td><strong>${r.total_goals} ⚽</strong></td>
       <td>${r.correct_count}</td>
       <td>${r.total_responses}</td>
-      <td>${vel}</td>
+      <td style="font-variant-numeric:tabular-nums">${vel}</td>
+      <td style="font-variant-numeric:tabular-nums;color:#888">${velTot}</td>
     </tr>`;
   }).join('');
 }
@@ -558,6 +560,15 @@ function showTab(id) {
   setTimeout(() => { Object.values(charts).forEach(c => { try { c && c.resize(); } catch(e){} }); }, 50);
 }
 function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 5000); }
+
+function fmtTime(seconds) {
+  if (!seconds && seconds !== 0) return '—';
+  const s = Math.round(Number(seconds));
+  if (isNaN(s)) return '—';
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
 
 // PRUEBAS siempre excluido a nivel de BD — no se necesita toggle
 function filterAgents(data) {
