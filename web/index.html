@@ -498,7 +498,15 @@ async function doApply() {
         source_file: state.fileName
       })
     });
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch(jsonErr) {
+      const text = await res.text().catch(() => '(sin respuesta)');
+      showScreen('screenPreview');
+      alert(`Error HTTP ${res.status}: ${text.slice(0, 200)}`);
+      return;
+    }
 
     if (!data.ok || data.ok === 'false') {
       showScreen('screenPreview');
@@ -518,7 +526,7 @@ async function doApply() {
     showScreen('screenResult');
   } catch(e) {
     showScreen('screenPreview');
-    alert('Error de conexión. Intenta de nuevo.');
+    alert('Error de red: ' + e.message);
   }
 }
 
