@@ -152,7 +152,8 @@
     <div class="refresh-bar">
       <div class="refresh-dot"></div>
       <span id="refreshLabel">Cargando datos...</span>
-      <button class="btn btn-sm" onclick="loadData()" style="margin-left:auto">↻ Actualizar</button>
+      <button class="btn btn-sm" id="btnTrazabilidad" onclick="descargarTrazabilidad()" style="margin-left:auto">📋 Informe de Trazabilidad</button>
+      <button class="btn btn-sm" onclick="loadData()">↻ Actualizar</button>
     </div>
 
     <div class="tabs">
@@ -272,6 +273,32 @@ async function loadData() {
     document.getElementById('refreshLabel').textContent = `Actualizado: ${d.generated_at}`;
     renderAll();
   } catch(e) { console.error('loadData error:', e); document.getElementById('refreshLabel').textContent = 'Error de conexión'; }
+}
+
+async function descargarTrazabilidad() {
+  const btn = document.getElementById('btnTrazabilidad');
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Generando informe...';
+  try {
+    const r = await fetch(`${N8N}/crack-tesos/dashboard/trazabilidad`, {
+      method: 'POST', headers: {'Content-Type':'application/json','x-admin-token': state.token},
+      body: JSON.stringify({})
+    });
+    const d = await r.json();
+    if (!d.ok) { alert(d.error || 'Error al generar el informe'); return; }
+    if (!d.resumen?.length && !d.detalle?.length) { alert('No hay datos de goles registrados todavía.'); return; }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.resumen || []), 'Resumen por Participante');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d.detalle || []), 'Detalle por Trivia');
+    XLSX.writeFile(wb, `trazabilidad_crack_tesos_${new Date().toISOString().split('T')[0]}.xlsx`);
+  } catch(e) {
+    console.error('descargarTrazabilidad error:', e);
+    alert('Error de conexión al generar el informe.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 }
 
 function renderAll() {

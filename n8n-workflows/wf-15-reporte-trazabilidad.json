@@ -1,0 +1,117 @@
+{
+  "name": "CT WF-15 — Reporte Trazabilidad",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crack-tesos/dashboard/trazabilidad",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook Trazabilidad",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $input.first().json.headers['x-admin-token'];\nif (!token) return [{json: {ok: 'false', error: 'No autorizado'}}];\ntry {\n  const decoded = Buffer.from(token, 'base64').toString('utf8');\n  const parts = decoded.split('|');\n  if (parts.length !== 3 || parts[2] !== 'CrackTesos2026_Admin_Token') return [{json: {ok: 'false', error: 'Token inválido'}}];\n  const age = Date.now() - parseInt(parts[1]);\n  if (age > 8 * 3600 * 1000) return [{json: {ok: 'false', error: 'Sesión expirada'}}];\n  return [{json: {ok: 'true', email: parts[0]}}];\n} catch(e) { return [{json: {ok: 'false', error: 'Token inválido'}}]; }"
+      },
+      "id": "validate",
+      "name": "Validar Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "leftValue": "", "typeValidation": "loose"},
+          "conditions": [{"id": "ok", "leftValue": "={{ $json.ok }}", "rightValue": "true", "operator": {"type": "string", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "¿Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_agg(t ORDER BY t.participante, t.trivia_number, t.fecha) AS data FROM (SELECT u.name AS participante, u.document_id AS cedula, u.agent_name AS agente, l.trivia_number, l.movement_type AS tipo_movimiento, l.amount AS goles, CASE WHEN l.movement_type='multiplier_bonus' THEN (regexp_match(l.description, 'por (\\d+) códigos'))[1]::int ELSE NULL END AS codigos_cargados, l.description AS descripcion, l.created_at AT TIME ZONE 'America/Bogota' AS fecha FROM ct_scoring_ledger l JOIN ct_users u ON l.user_id = u.user_id WHERE u.agent_name IS NULL OR u.agent_name != 'PRUEBAS') t",
+        "options": {}
+      },
+      "id": "q-detalle",
+      "name": "Query Detalle",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 200],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_agg(t ORDER BY t.total_calculado DESC) AS data FROM (SELECT u.name AS participante, u.document_id AS cedula, u.agent_name AS agente, COALESCE(SUM(CASE WHEN l.movement_type='trivia_base' THEN l.amount END),0) AS goles_base, COALESCE(SUM(CASE WHEN l.movement_type='speed_bonus' THEN l.amount END),0) AS goles_velocidad, COALESCE(SUM(CASE WHEN l.movement_type='multiplier_bonus' THEN l.amount END),0) AS goles_multiplicador, COALESCE(SUM(CASE WHEN l.movement_type='multiplier_bonus' THEN (regexp_match(l.description,'por (\\d+) códigos'))[1]::int END),0) AS codigos_totales, COALESCE(SUM(CASE WHEN l.movement_type='adjustment' THEN l.amount END),0) AS ajustes, COALESCE(SUM(l.amount),0) AS total_calculado, u.total_goals AS total_sistema, COALESCE(SUM(l.amount),0) - u.total_goals AS diferencia FROM ct_users u LEFT JOIN ct_scoring_ledger l ON u.user_id = l.user_id WHERE u.agent_name IS NULL OR u.agent_name != 'PRUEBAS' GROUP BY u.user_id, u.name, u.document_id, u.agent_name, u.total_goals) t",
+        "options": {}
+      },
+      "id": "q-resumen",
+      "name": "Query Resumen",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 400],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "function parseData(nodeName) {\n  const raw = $(nodeName).first().json.data;\n  return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []);\n}\n\nconst detalle = parseData('Query Detalle');\nconst resumen = parseData('Query Resumen');\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  detalle,\n  resumen\n}}];"
+      },
+      "id": "build",
+      "name": "Construir Respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={{ {ok: false, error: $('Validar Token').first().json.error} }}"
+      },
+      "id": "respond-error",
+      "name": "Responder Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 550]
+    }
+  ],
+  "connections": {
+    "Webhook Trazabilidad": {"main": [[{"node": "Validar Token", "type": "main", "index": 0}]]},
+    "Validar Token": {"main": [[{"node": "¿Válido?", "type": "main", "index": 0}]]},
+    "¿Válido?": {
+      "main": [
+        [{"node": "Query Detalle", "type": "main", "index": 0}],
+        [{"node": "Responder Error", "type": "main", "index": 0}]
+      ]
+    },
+    "Query Detalle": {"main": [[{"node": "Query Resumen", "type": "main", "index": 0}]]},
+    "Query Resumen": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Construir Respuesta": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "tags": [{"name": "crack-tesos"}, {"name": "dashboard"}]
+}
