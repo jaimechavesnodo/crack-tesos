@@ -17,6 +17,7 @@ Actividad de engagement para distribuidores Terpel vía WhatsApp (trivias + acum
 - Gmail credential: id `MPFuKPfWjUdoz0Gt`, nombre "Gmail account"
 - Token webhook WATI: ver constante en `wf-01` a `wf-05` y flujos de `wati-flows/` (header `x-wati-token`)
 - Token admin: Base64 `email|timestamp|<secreto>`, ver constante en `wf-11-auth.json`, válido 8h
+- Claude API (WF-14): credential `httpHeaderAuth` llamado "Claude API Key (x-api-key)" — la API key NUNCA va hardcodeada en el JSON del workflow ni en este repo. Si reimportas WF-14 y el nodo "Claude API — Análisis" pide credential, créalo en n8n (Header Name: `x-api-key`, Header Value: la key real) y asígnalo
 
 ## Deploy — cómo se publican los cambios
 

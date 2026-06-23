@@ -3,29 +3,16 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [{"field": "cronExpression", "expression": "0 5 * * *"}]
-        }
-      },
-      "id": "cron",
-      "name": "Cron 12AM Bogotá (05:00 UTC)",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [240, 300],
-      "notes": "05:00 UTC = 12:00 AM hora Bogotá (UTC-5)"
-    },
-    {
-      "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT\n  (SELECT COUNT(*) FROM ct_users WHERE status='active' AND agent_name!='PRUEBAS') AS total_usuarios,\n  (SELECT COUNT(*) FROM ct_users WHERE registered=true AND status='active' AND agent_name!='PRUEBAS') AS registrados,\n  (SELECT COUNT(DISTINCT user_id) FROM ct_trivia_responses WHERE is_duplicate=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS')) AS activos,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_duplicate=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS')) AS total_respuestas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct=TRUE AND is_duplicate=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS')) AS correctas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct=FALSE AND is_duplicate=FALSE AND is_out_of_time=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS')) AS incorrectas,\n  (SELECT COALESCE(SUM(total_goals),0) FROM ct_users WHERE status='active' AND agent_name!='PRUEBAS') AS goles_totales,\n  (SELECT COUNT(*) FROM ct_trivias WHERE status='sent') AS trivias_activas,\n  (SELECT COUNT(*) FROM ct_trivias WHERE status IN ('sent','closed','settled')) - (SELECT COUNT(*) FROM ct_trivias WHERE status='sent') AS trivias_sin_actividad",
+        "query": "SELECT\n  (SELECT COUNT(*) FROM ct_users WHERE status='active' AND agent_name!='PRUEBAS') AS total_usuarios,\n  (SELECT COUNT(*) FROM ct_users WHERE registered=true AND status='active' AND agent_name!='PRUEBAS') AS registrados,\n  (SELECT COUNT(DISTINCT user_id) FROM ct_trivia_responses WHERE is_duplicate=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS')) AS activos,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_duplicate=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS')) AS total_respuestas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct=TRUE AND is_duplicate=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS')) AS correctas,\n  (SELECT COUNT(*) FROM ct_trivia_responses WHERE is_correct=FALSE AND is_duplicate=FALSE AND is_out_of_time=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS')) AS incorrectas,\n  (SELECT COALESCE(SUM(total_goals),0) FROM ct_users WHERE status='active' AND agent_name!='PRUEBAS') AS goles_totales,\n  (SELECT COUNT(*) FROM ct_trivias WHERE status='sent') AS trivias_activas,\n  (SELECT COUNT(*) FROM ct_trivias WHERE status IN ('sent','closed','settled')) - (SELECT COUNT(*) FROM ct_trivias WHERE status='sent') AS trivias_sin_actividad,\n  (SELECT COUNT(DISTINCT u.agent_id) FROM ct_users u JOIN ct_trivia_responses r ON u.user_id = r.user_id WHERE r.is_duplicate=FALSE AND u.status='active' AND u.agent_id!='AGT-19') AS agentes_activos",
         "options": {}
       },
-      "id": "q-kpis",
+      "id": "75b74153-5f9c-42bd-95d9-b338b2a04d09",
       "name": "Query KPIs",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [460, 300],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [224, 0],
+      "credentials": {"postgres": {"id": "Sff6cVWV0sgHQvDE", "name": "Postgres account"}}
     },
     {
       "parameters": {
@@ -33,25 +20,25 @@
         "query": "SELECT rank_general, name, agent_name, total_goals, correct_count, total_responses, ROUND(avg_speed_seconds::numeric / 60, 1) AS vel_min FROM v_ct_rankings WHERE status='active' AND agent_name!='PRUEBAS' AND total_responses>0 ORDER BY total_goals DESC, avg_speed_seconds ASC NULLS LAST LIMIT 5",
         "options": {}
       },
-      "id": "q-top5",
+      "id": "2cf11267-283a-4f56-850e-c460b930be75",
       "name": "Query Top 5",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [460, 460],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [224, 160],
+      "credentials": {"postgres": {"id": "Sff6cVWV0sgHQvDE", "name": "Postgres account"}}
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT u.agent_name, COUNT(DISTINCT u.user_id) AS participantes, COUNT(DISTINCT CASE WHEN u.registered THEN u.user_id END) AS registrados, COALESCE(SUM(u.total_goals), 0) AS goles, COUNT(r.response_id) AS respuestas, CASE WHEN COUNT(r.response_id) > 0 THEN ROUND(COUNT(CASE WHEN r.is_correct THEN 1 END)::numeric / COUNT(r.response_id) * 100) ELSE 0 END AS pct_acierto FROM ct_users u LEFT JOIN ct_trivia_responses r ON u.user_id = r.user_id AND r.is_duplicate = FALSE WHERE u.status = 'active' AND u.agent_name IS NOT NULL AND u.agent_name != 'PRUEBAS' GROUP BY u.agent_name ORDER BY goles DESC LIMIT 1",
+        "query": "WITH user_agg AS (SELECT agent_name, COUNT(DISTINCT user_id) AS participantes, COUNT(DISTINCT CASE WHEN registered THEN user_id END) AS registrados, COALESCE(SUM(total_goals), 0) AS goles FROM ct_users WHERE status='active' AND agent_name IS NOT NULL AND agent_name!='PRUEBAS' GROUP BY agent_name), resp_agg AS (SELECT u.agent_name, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_trivia_responses r JOIN ct_users u ON r.user_id=u.user_id WHERE r.is_duplicate=FALSE AND u.agent_name!='PRUEBAS' GROUP BY u.agent_name) SELECT ua.agent_name, ua.participantes, ua.registrados, ua.goles, COALESCE(ra.respuestas,0) AS respuestas, CASE WHEN COALESCE(ra.respuestas,0)>0 THEN ROUND(COALESCE(ra.correctas,0)::numeric/ra.respuestas*100) ELSE 0 END AS pct_acierto FROM user_agg ua LEFT JOIN resp_agg ra ON ua.agent_name=ra.agent_name ORDER BY goles DESC LIMIT 5",
         "options": {}
       },
-      "id": "q-top-agent",
-      "name": "Query Agente Líder",
+      "id": "bb63f058-1400-4833-bd54-9870ebb07e12",
+      "name": "Query Top 5 Agentes",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [460, 620],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [224, 320],
+      "credentials": {"postgres": {"id": "Sff6cVWV0sgHQvDE", "name": "Postgres account"}}
     },
     {
       "parameters": {
@@ -59,12 +46,12 @@
         "query": "SELECT DATE(responded_at AT TIME ZONE 'America/Bogota') AS dia, COUNT(*) AS respuestas, SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correctas FROM ct_trivia_responses WHERE is_duplicate=FALSE AND user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS') GROUP BY dia ORDER BY dia ASC",
         "options": {}
       },
-      "id": "q-daily",
+      "id": "65949672-1b5f-4d1b-91c1-434bfaac1f13",
       "name": "Query Diario",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [460, 780],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [224, 480],
+      "credentials": {"postgres": {"id": "Sff6cVWV0sgHQvDE", "name": "Postgres account"}}
     },
     {
       "parameters": {
@@ -72,95 +59,107 @@
         "query": "SELECT t.trivia_number, t.question, t.sent_at AT TIME ZONE 'America/Bogota' AS sent_bogota, t.closes_at AT TIME ZONE 'America/Bogota' AS closes_bogota, COUNT(r.response_id) AS respuestas, COUNT(CASE WHEN r.is_correct THEN 1 END) AS correctas FROM ct_trivias t LEFT JOIN ct_trivia_responses r ON t.trivia_id = r.trivia_id AND r.is_duplicate=FALSE AND r.user_id NOT IN (SELECT user_id FROM ct_users WHERE agent_name='PRUEBAS') WHERE t.status IN ('sent','closed','settled') GROUP BY t.trivia_id, t.trivia_number, t.question, t.sent_at, t.closes_at ORDER BY t.trivia_number",
         "options": {}
       },
-      "id": "q-trivias",
+      "id": "3d01f33e-0228-4326-8211-21234bbf71e3",
       "name": "Query Trivias",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [460, 940],
-      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+      "position": [224, 640],
+      "credentials": {"postgres": {"id": "Sff6cVWV0sgHQvDE", "name": "Postgres account"}}
     },
     {
       "parameters": {
-        "jsCode": "// Recopilar todos los datos y preparar contexto para Claude\nconst kpis      = $('Query KPIs').first().json;\nconst top5      = $('Query Top 5').all().map(i => i.json);\nconst topAgent  = $('Query Agente Líder').first().json;\nconst daily     = $('Query Diario').all().map(i => i.json);\nconst trivias   = $('Query Trivias').all().map(i => i.json);\n\nconst now = new Date();\nconst fechaBogota = now.toLocaleString('es-CO', {timeZone:'America/Bogota', dateStyle:'full'});\nconst fechaCorta  = now.toLocaleDateString('es-CO', {timeZone:'America/Bogota', day:'numeric', month:'long'});\nconst fechaReporte= now.toLocaleString('es-CO', {timeZone:'America/Bogota'});\n\nconst tasaAcierto = kpis.total_respuestas > 0\n  ? Math.round(kpis.correctas / kpis.total_respuestas * 100) + '%'\n  : '0%';\nconst tasaPart = kpis.total_usuarios > 0\n  ? (kpis.activos / kpis.total_usuarios * 100).toFixed(2) + '%'\n  : '0%';\n\n// Proyección simple\nlet proyeccion = null;\nif (daily.length >= 2) {\n  const n = daily.length;\n  const pts = daily.map((d, i) => ({x: i+1, y: daily.slice(0,i+1).reduce((s,r)=>s+parseInt(r.respuestas),0)}));\n  const sx = pts.reduce((s,p)=>s+p.x,0), sy = pts.reduce((s,p)=>s+p.y,0);\n  const sxy = pts.reduce((s,p)=>s+p.x*p.y,0), sx2 = pts.reduce((s,p)=>s+p.x*p.x,0);\n  const slope = (n*sxy-sx*sy)/(n*sx2-sx*sx);\n  const intercept = (sy-slope*sx)/n;\n  const pred37 = Math.round(slope*37+intercept);\n  const residuals = pts.map((p,i)=>p.y-(slope*(i+1)+intercept));\n  const se = Math.sqrt(residuals.reduce((s,r)=>s+r*r,0)/Math.max(n-2,1));\n  const r2 = 1 - residuals.reduce((s,r)=>s+r*r,0)/pts.reduce((s,p)=>{const m=sy/n;return s+(p.y-m)**2;},0);\n  proyeccion = {slope: slope.toFixed(1), r2: (r2*100).toFixed(0), se: se.toFixed(0), pred37, n};\n}\n\n// Contexto para Claude\nconst contexto = `\nDatos del reporte diario Crack Tesos 2026 — ${fechaBogota}\n\nKPIs generales:\n- Total participantes activos: ${kpis.total_usuarios}\n- Registrados: ${kpis.registrados}\n- Han participado: ${kpis.activos}\n- Respuestas totales: ${kpis.total_respuestas}\n- Correctas: ${kpis.correctas} | Incorrectas: ${kpis.incorrectas}\n- Tasa de acierto: ${tasaAcierto}\n- Tasa de participación: ${tasaPart}\n- Goles acumulados totales: ${kpis.goles_totales}\n- Trivias activas: ${kpis.trivias_activas}\n\nTop 5 ranking:\n${top5.map((p,i)=>`${i+1}. ${p.name} (${p.agent_name}) — ${p.total_goals} goles, ${p.correct_count} correctas, ${p.vel_min} min prom`).join('\\n')}\n\nAgente líder: ${topAgent.agent_name} — ${topAgent.participantes} participantes, ${topAgent.goles} goles, ${topAgent.pct_acierto}% acierto\n\nTrivias enviadas:\n${trivias.map(t=>`Trivia #${t.trivia_number}: ${t.respuestas} respuestas, ${t.correctas} correctas`).join('\\n')}\n\nParticipación diaria:\n${daily.map(d=>`${d.dia}: ${d.respuestas} respuestas (${d.correctas} correctas)`).join('\\n')}\n\n${proyeccion ? `Proyección (regresión lineal, n=${proyeccion.n} días): pendiente=${proyeccion.slope} resp/día, R²=${proyeccion.r2}%, SE=${proyeccion.se}, proyección día 37: ${proyeccion.pred37} respuestas acumuladas` : 'Proyección: insuficientes datos (se necesitan ≥2 días)'}\n`;\n\nreturn [{json: {\n  kpis, top5, topAgent, daily, trivias, proyeccion,\n  fechaReporte, fechaCorta, fechaBogota,\n  tasaAcierto, tasaPart,\n  contexto\n}}];"
+        "jsCode": "// Recopilar todos los datos\nconst kpis       = $('Query KPIs').first().json;\nconst top5       = $('Query Top 5').all().map(i => i.json);\nconst agentsTop5 = $('Query Top 5 Agentes').all().map(i => i.json);\nconst daily      = $('Query Diario').all().map(i => i.json);\nconst trivias    = $('Query Trivias').all().map(i => i.json);\n\nconst now = new Date();\nconst fechaBogota  = now.toLocaleString('es-CO', {timeZone:'America/Bogota', dateStyle:'full'});\nconst fechaCorta   = now.toLocaleDateString('es-CO', {timeZone:'America/Bogota', day:'numeric', month:'long'});\nconst fechaReporte = now.toLocaleString('es-CO', {timeZone:'America/Bogota'});\n\nconst tasaAcierto = kpis.total_respuestas > 0\n  ? Math.round(kpis.correctas / kpis.total_respuestas * 100) + '%'\n  : '0%';\nconst tasaPart = kpis.total_usuarios > 0\n  ? (kpis.activos / kpis.total_usuarios * 100).toFixed(2) + '%'\n  : '0%';\n\n// Proyección lineal\nlet proyeccion = null;\nif (daily.length >= 2) {\n  const n = daily.length;\n  const pts = daily.map((d, i) => ({x: i+1, y: daily.slice(0,i+1).reduce((s,r)=>s+parseInt(r.respuestas),0)}));\n  const sx = pts.reduce((s,p)=>s+p.x,0), sy = pts.reduce((s,p)=>s+p.y,0);\n  const sxy = pts.reduce((s,p)=>s+p.x*p.y,0), sx2 = pts.reduce((s,p)=>s+p.x*p.x,0);\n  const slope = (n*sxy-sx*sy)/(n*sx2-sx*sx);\n  const intercept = (sy-slope*sx)/n;\n  const pred37 = Math.round(slope*37+intercept);\n  const residuals = pts.map((p,i)=>p.y-(slope*(i+1)+intercept));\n  const se = Math.sqrt(residuals.reduce((s,r)=>s+r*r,0)/Math.max(n-2,1));\n  const sst = pts.reduce((s,p)=>{const m=sy/n;return s+(p.y-m)**2;},0);\n  const r2 = sst > 0 ? 1 - residuals.reduce((s,r)=>s+r*r,0)/sst : 0;\n  proyeccion = {slope: slope.toFixed(1), r2: (r2*100).toFixed(0), se: se.toFixed(0), pred37, n};\n}\n\n// Texto proyección en palabras sencillas\nlet proyeccionTexto = 'Con los datos actuales aún no hay suficiente información para hacer una proyección confiable. Se necesitan al menos 2 días de actividad para calcular la tendencia.';\nif (proyeccion) {\n  const slopeN = parseFloat(proyeccion.slope);\n  const r2N = parseFloat(proyeccion.r2);\n  const trendDir = slopeN > 2 ? 'creciente' : slopeN > 0 ? 'positiva' : 'descendente';\n  const confianza = r2N > 70\n    ? 'Los datos históricos son consistentes, así que esta proyección es bastante confiable.'\n    : 'Como hay pocos días de datos, esta proyección puede cambiar significativamente con más actividad.';\n  proyeccionTexto = `El sistema está analizando cómo ha crecido la participación día a día. Cada día llegan aproximadamente <strong>${Math.round(parseFloat(proyeccion.slope))} respuestas nuevas</strong>, lo que indica una tendencia ${trendDir}. Si la tendencia se mantiene así, al finalizar el Crack Tesos (día 37) se esperaría llegar a aproximadamente <strong>${proyeccion.pred37} respuestas acumuladas</strong>. ${confianza}`;\n}\n\nconst contexto = `Datos del reporte diario Crack Tesos 2026 — ${fechaBogota}\n\nKPIs generales:\n- Total participantes activos: ${kpis.total_usuarios}\n- Registrados: ${kpis.registrados}\n- Han participado: ${kpis.activos}\n- Agentes comerciales activos: ${kpis.agentes_activos || 0}\n- Respuestas totales: ${kpis.total_respuestas}\n- Correctas: ${kpis.correctas} | Incorrectas: ${kpis.incorrectas}\n- Tasa de acierto: ${tasaAcierto}\n- Goles acumulados totales: ${kpis.goles_totales}\n\nTop 5 ranking:\n${top5.map((p,i)=>`${i+1}. ${p.name} (${p.agent_name}) — ${p.total_goals} goles, ${p.correct_count} correctas, ${p.vel_min} min prom`).join('\\n')}\n\nTop 5 agentes comerciales:\n${agentsTop5.map((a,i)=>`${i+1}. ${a.agent_name} — ${a.participantes} part., ${a.goles} goles, ${a.pct_acierto}% acierto`).join('\\n')}\n\nTrivias enviadas:\n${trivias.map(t=>`Trivia #${t.trivia_number}: ${t.respuestas} respuestas, ${t.correctas} correctas`).join('\\n')}\n\nParticipacion diaria:\n${daily.map(d=>`${d.dia}: ${d.respuestas} respuestas (${d.correctas} correctas)`).join('\\n')}\n\n${proyeccion ? `Proyeccion: pendiente=${proyeccion.slope} resp/dia, R2=${proyeccion.r2}%, proyeccion dia 37: ${proyeccion.pred37} respuestas` : 'Proyeccion: insuficientes datos'}`;\n\nconst claudeBody = JSON.stringify({\n  model: 'claude-haiku-4-5-20251001',\n  max_tokens: 1200,\n  messages: [{\n    role: 'user',\n    content: 'Eres analista de datos del programa Crack Tesos 2026 de Terpel. Basandote en los siguientes datos, genera exactamente 5 analisis en espanol, cada uno de maximo 3 lineas cortas, en tono profesional pero motivador. Devuelve SOLO un JSON con las claves: general, trivia, ranking, agente, proyeccion.\\n\\nDATOS:\\n' + contexto + '\\n\\nIMPORTANTE: Responde SOLO el JSON sin markdown ni explicaciones adicionales.'\n  }]\n});\n\nreturn [{json: {\n  kpis, top5, agentsTop5, daily, trivias, proyeccion,\n  fechaReporte, fechaCorta, fechaBogota,\n  tasaAcierto, tasaPart, proyeccionTexto,\n  contexto,\n  claudeBody\n}}];\n"
       },
-      "id": "build-context",
+      "id": "3455bf4f-4f80-4f36-befa-6b296792d023",
       "name": "Preparar Contexto",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [680, 620]
+      "position": [448, 320]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {"name": "x-api-key", "value": "={{ $credentials.anthropicApi }}"},
             {"name": "anthropic-version", "value": "2023-06-01"},
             {"name": "content-type", "value": "application/json"}
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "=",
-              "value": "={{ JSON.stringify({\n  model: 'claude-haiku-4-5-20251001',\n  max_tokens: 1200,\n  messages: [{\n    role: 'user',\n    content: `Eres analista de datos del programa Crack Tesos 2026 de Terpel. Basándote en los siguientes datos, genera exactamente 5 análisis en español, cada uno de máximo 3 líneas cortas, en tono profesional pero motivador. Devuelve SOLO un JSON con las claves: general, trivia, ranking, agente, proyeccion.\\n\\nDATOS:\\n${$json.contexto}\\n\\nIMPORTANTE: Responde SOLO el JSON sin markdown ni explicaciones adicionales.`\n  }]\n}) }}"
-            }
-          ]
-        },
-        "options": {},
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.claudeBody }}",
+        "options": {}
       },
-      "id": "claude-api",
+      "id": "ea76b9bb-7db2-4904-bac4-104b174e97c2",
       "name": "Claude API — Análisis",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 620],
-      "credentials": {"httpHeaderAuth": {"id": "anthropic-creds", "name": "Anthropic API"}}
+      "position": [672, 320],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PENDIENTE_ASIGNAR",
+          "name": "Claude API Key (x-api-key)"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "const ctx = $('Preparar Contexto').first().json;\nconst claudeResp = $input.first().json;\n\n// Parsear respuesta de Claude\nlet analisis = {general:'', trivia:'', ranking:'', agente:'', proyeccion:''};\ntry {\n  const content = claudeResp.content?.[0]?.text || '{}';\n  const parsed = JSON.parse(content);\n  analisis = {...analisis, ...parsed};\n} catch(e) {\n  analisis.general = 'Análisis no disponible.';\n}\n\nconst {kpis, top5, topAgent, trivias, proyeccion, fechaReporte, fechaCorta, tasaAcierto, tasaPart} = ctx;\n\n// Helper para filas del ranking\nconst rankRow = (pos, p, highlight) => {\n  if (!p) return `<tr><td style=\"padding:8px 16px;color:#ccc;\">${pos}°</td><td colspan=\"5\" style=\"padding:8px 16px;color:#ccc;\">Sin datos</td></tr>`;\n  const color = highlight ? '#333' : '#aaa';\n  const size = highlight ? '13px' : '12px';\n  const vel = p.vel_min ? `${p.vel_min} min` : '—';\n  return `<tr style=\"border-bottom:1px solid #eee;\">\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${size};color:${highlight?'#f5a623':'#ccc'};font-weight:bold;\">${pos}°</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${size};color:${color};font-weight:${highlight?'bold':'normal'};\">${p.name}</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:11px;color:#aaa;\">${p.agent_name||'—'}</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${highlight?'14':'12'}px;color:${color};font-weight:bold;text-align:center;\">${p.total_goals}</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${size};color:#5cb85c;text-align:center;\">${p.correct_count}</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${size};color:${highlight?'#5cb85c':'#aaa'};text-align:center;\">${vel}</td>\n  </tr>`;\n};\n\n// Trivias rows\nconst triviaRows = trivias.map(t => `\n  <tr style=\"border-top:1px solid #eee;\">\n    <td style=\"padding:6px 12px;font-size:12px;color:#444;\">Trivia #${t.trivia_number}</td>\n    <td><div style=\"background:${t.respuestas>0?'#5bc0de':'#e8e8e8'};height:10px;width:${t.respuestas>0?Math.min(t.respuestas*10,100):4}%;border-radius:2px;\"></div></td>\n    <td style=\"font-size:11px;color:#444;text-align:right;padding:0 12px;\">${t.respuestas}</td>\n  </tr>`).join('');\n\n// Proyección texto\nconst projText = proyeccion\n  ? `<div style=\"display:inline-block;background:#f0f7ff;border:1px solid #c8e0f5;border-radius:4px;padding:10px 20px;\"><span style=\"font-size:13px;color:#1a73e8;font-weight:bold;\">📈 Proyección día 37: <strong>${proyeccion.pred37} respuestas acumuladas</strong> · R²=${proyeccion.r2}% · SE±${proyeccion.se}</span></div>`\n  : `<div style=\"font-size:13px;color:#888;\">Insuficientes datos para proyección (se necesitan ≥2 días de actividad).</div>`;\n\n// Alerta trivia activa\nconst triviaActiva = trivias.find(t => t.respuestas >= 0);\nconst alertaTrivia = triviaActiva\n  ? `<strong>Trivia #${triviaActiva.trivia_number} activa.</strong> Ya van <strong>${triviaActiva.respuestas} respuestas</strong> registradas hoy.`\n  : 'No hay trivias activas en este momento.';\n\nconst logoUrl = 'https://nodo.host/crack-tesos/images/logo-nodo.png';\nconst dashUrl = 'https://nodo.host/crack-tesos/dashboard.html';\n\nconst html = `<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"></head>\n<body style=\"margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#f5f5f5;\">\n<tr><td align=\"center\" style=\"padding:24px 16px;\">\n<table width=\"640\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:640px;\">\n\n<!-- HEADER -->\n<tr><td style=\"background:#1a1a2e;border-radius:8px 8px 0 0;padding:20px 24px;\">\n  <table width=\"100%\"><tr>\n    <td><img src=\"${logoUrl}\" height=\"32\" alt=\"NODO\" style=\"filter:brightness(0) invert(1);\"> &nbsp; <span style=\"color:white;font-size:18px;font-weight:bold;\">CRACK TESOS 2026</span></td>\n    <td style=\"text-align:right;color:#aaa;font-size:12px;\">Analytics Daily · ${fechaReporte}</td>\n  </tr></table>\n</td></tr>\n\n<!-- PRE-HEADER -->\n<tr><td style=\"font-size:12px;color:#555;padding:8px 0;\">\n  ✉ <strong>Crack Tesos 2026</strong> &nbsp;·&nbsp; Reporte diario — ${fechaCorta}\n</td></tr>\n\n<!-- ALERTA -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff8e6;border:1px solid #f0c040;border-radius:4px;\"><tr>\n    <td style=\"padding:12px 16px;font-size:13px;color:#7a5800;\">\n      ⚠️ ${alertaTrivia}\n    </td>\n  </tr></table>\n</td></tr>\n\n<!-- KPIs -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\"><tr>\n    <td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">✉ Actividad General — ${fechaCorta}</strong></td>\n  </tr><tr><td style=\"padding:16px;\">\n    <table width=\"100%\"><tr>\n      <td width=\"25%\" style=\"text-align:center;border-right:1px solid #eee;\">\n        <div style=\"font-size:32px;font-weight:300;color:#333;\">${kpis.total_usuarios}</div>\n        <div style=\"font-size:11px;color:#888;\">Participantes Activos</div>\n      </td>\n      <td width=\"25%\" style=\"text-align:center;border-right:1px solid #eee;\">\n        <div style=\"font-size:32px;font-weight:300;color:#333;\">${kpis.total_respuestas}</div>\n        <div style=\"font-size:11px;color:#888;\">Respuestas Registradas</div>\n      </td>\n      <td width=\"25%\" style=\"text-align:center;border-right:1px solid #eee;\">\n        <div style=\"font-size:32px;font-weight:300;color:#333;\">${kpis.goles_totales}</div>\n        <div style=\"font-size:11px;color:#888;\">Goles Acumulados ⚽</div>\n      </td>\n      <td width=\"25%\" style=\"text-align:center;\">\n        <div style=\"font-size:32px;font-weight:300;color:#333;\">${tasaAcierto}</div>\n        <div style=\"font-size:11px;color:#888;\">Tasa de Acierto</div>\n        <div style=\"font-size:12px;color:#1a73e8;\">${kpis.correctas}✅ / ${kpis.incorrectas}❌</div>\n      </td>\n    </tr></table>\n    <div style=\"margin-top:14px;padding-top:12px;border-top:1px solid #eee;font-size:12px;color:#555;line-height:1.6;\">${analisis.general}</div>\n  </td></tr></table>\n</td></tr>\n\n<!-- RANKING -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\"><tr>\n    <td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">🏆 Ranking General — Top 5</strong></td>\n  </tr><tr>\n    <td style=\"padding:12px 16px 4px;font-size:12px;color:#555;line-height:1.6;border-bottom:1px solid #eee;\">${analisis.ranking}</td>\n  </tr><tr><td style=\"padding:0;\">\n    <table width=\"100%\">\n      <tr style=\"background:#f9f9f9;\"><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;width:30px;\">#</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;\">Participante</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;\">Agente</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Goles ⚽</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Correctas</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Vel.</td></tr>\n      ${rankRow('1', top5[0], true)}\n      ${rankRow('2', top5[1], true)}\n      ${rankRow('3', top5[2], false)}\n      ${rankRow('4', top5[3], false)}\n      ${rankRow('5', top5[4], false)}\n    </table>\n  </td></tr></table>\n</td></tr>\n\n<!-- TRIVIAS -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\"><tr>\n    <td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">📋 Actividad por Trivia</strong></td>\n  </tr><tr>\n    <td style=\"padding:12px 16px 4px;font-size:12px;color:#555;line-height:1.6;border-bottom:1px solid #eee;\">${analisis.trivia}</td>\n  </tr><tr><td style=\"padding:16px;\">\n    <table width=\"100%\">${triviaRows}</table>\n  </td></tr></table>\n</td></tr>\n\n<!-- AGENTE -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\"><tr>\n    <td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">🏢 Agente Líder del Día</strong></td>\n  </tr><tr>\n    <td style=\"padding:12px 16px 4px;font-size:12px;color:#555;line-height:1.6;border-bottom:1px solid #eee;\">${analisis.agente}</td>\n  </tr><tr><td style=\"padding:16px;\">\n    <table width=\"100%\"><tr>\n      <td style=\"padding:8px 12px;font-size:14px;color:#333;font-weight:bold;\">${topAgent.agent_name||'—'}</td>\n      <td style=\"padding:8px 12px;font-size:13px;color:#555;text-align:center;\">${topAgent.participantes} part.</td>\n      <td style=\"padding:8px 12px;font-size:13px;color:#555;text-align:center;\">${topAgent.registrados} reg.</td>\n      <td style=\"padding:8px 12px;font-size:14px;color:#333;font-weight:bold;text-align:center;\">${topAgent.goles} ⚽</td>\n      <td style=\"padding:8px 12px;font-size:13px;color:#5cb85c;text-align:center;font-weight:bold;\">${topAgent.pct_acierto}%</td>\n    </tr></table>\n  </td></tr></table>\n</td></tr>\n\n<!-- PROYECCIÓN -->\n<tr><td style=\"padding-bottom:24px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\"><tr>\n    <td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">📈 Proyección de Participación</strong></td>\n  </tr><tr>\n    <td style=\"padding:12px 16px 4px;font-size:12px;color:#555;line-height:1.6;border-bottom:1px solid #eee;\">${analisis.proyeccion}</td>\n  </tr><tr><td style=\"padding:24px 16px;text-align:center;\">${projText}</td></tr></table>\n</td></tr>\n\n<!-- CTA DASHBOARD -->\n<tr><td style=\"padding-bottom:20px;text-align:center;\">\n  <a href=\"${dashUrl}\" style=\"display:inline-block;background:#1a1a2e;color:white;padding:12px 32px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:bold;\">📊 Ver Dashboard Completo →</a>\n</td></tr>\n\n<!-- FOOTER -->\n<tr><td style=\"text-align:center;padding-bottom:16px;border-top:1px solid #e0e0e0;padding-top:16px;\">\n  <img src=\"${logoUrl}\" height=\"20\" alt=\"NODO\" style=\"opacity:0.4;vertical-align:middle;margin-right:6px;\">\n  <span style=\"font-size:11px;color:#aaa;\">Powered by NODO · v1.6 · 2026 · <a href=\"https://www.nodo.live\" style=\"color:#aaa;\">www.nodo.live</a></span><br>\n  <span style=\"font-size:11px;color:#aaa;\">Reporte automático generado por NODO · Crack Tesos 2026 · Bogotá, Colombia</span>\n</td></tr>\n\n</table></td></tr></table>\n</body></html>`;\n\nreturn [{json: {\n  html,\n  subject: `⚽ Crack Tesos 2026 — Reporte del ${ctx.fechaCorta}`,\n  fechaCorta: ctx.fechaCorta\n}}];"
+        "jsCode": "const ctx = $('Preparar Contexto').first().json;\nconst claudeResp = $input.first().json;\n\nlet analisis = {general:'', trivia:'', ranking:'', agente:'', proyeccion:''};\ntry {\n  const content = claudeResp.content?.[0]?.text || '{}';\n  const parsed = JSON.parse(content);\n  analisis = {...analisis, ...parsed};\n} catch(e) {}\n\nconst {kpis, top5, agentsTop5, trivias, proyeccion, proyeccionTexto,\n       fechaReporte, fechaCorta, tasaAcierto, tasaPart} = ctx;\n\nconst logoUrl = 'https://nodo.host/crack-tesos/images/logo-nodo.png';\nconst dashUrl = 'https://nodo.host/crack-tesos/dashboard.html';\n\n// Alerta: última trivia activa\nconst triviaActiva = trivias.slice().reverse().find(t => parseInt(t.respuestas) > 0) || trivias[trivias.length - 1];\nconst alertaTrivia = triviaActiva\n  ? `<strong>Trivia #${triviaActiva.trivia_number} activa.</strong> Ya van <strong>${triviaActiva.respuestas} respuestas</strong> registradas.`\n  : 'No hay trivias activas en este momento.';\n\n// Filas del ranking top 5\nconst rankRow = (pos, p, highlight) => {\n  if (!p) return '';\n  const color = highlight ? '#333' : '#aaa';\n  const size = highlight ? '13px' : '12px';\n  const vel = p.vel_min ? `${p.vel_min} min` : '—';\n  const posColor = pos === 1 ? '#f5a623' : pos <= 2 ? '#888' : '#ccc';\n  return `<tr style=\"border-bottom:1px solid #eee;\">\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${size};color:${posColor};font-weight:bold;\">${pos}°</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${size};color:${color};font-weight:${highlight?'bold':'normal'};\">${p.name}</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:11px;color:#aaa;\">${p.agent_name||'—'}</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${highlight?'14':'12'}px;color:${color};font-weight:bold;text-align:center;\">${p.total_goals}</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${size};color:#5cb85c;text-align:center;\">${p.correct_count}</td>\n    <td style=\"padding:${highlight?'10':'8'}px 16px;font-size:${size};color:${highlight?'#5cb85c':'#aaa'};text-align:center;\">${vel}</td>\n  </tr>`;\n};\n\n// Filas top 5 agentes\nconst agentRow = (pos, a) => {\n  if (!a) return '';\n  const maxGoles = agentsTop5[0]?.goles || 1;\n  const barW = Math.max(4, Math.round((a.goles / maxGoles) * 100));\n  return `<tr style=\"border-top:1px solid #eee;\">\n    <td style=\"padding:8px 12px;font-size:${pos===1?'14':'12'}px;color:${pos===1?'#333':'#666'};font-weight:${pos===1?'bold':'normal'};\">${pos}° ${a.agent_name||'—'}</td>\n    <td style=\"padding:8px 12px;font-size:12px;color:#555;text-align:center;\">${a.participantes} part.</td>\n    <td style=\"padding:8px 12px;font-size:12px;color:#555;text-align:center;\">${a.registrados} reg.</td>\n    <td style=\"padding:8px 12px;\">\n      <div style=\"background:#5bc0de;height:12px;width:${barW}%;border-radius:2px;min-width:4px;\"></div>\n      <span style=\"font-size:11px;color:#333;font-weight:bold;\">${a.goles} ⚽</span>\n    </td>\n    <td style=\"padding:8px 12px;font-size:12px;color:#5cb85c;text-align:center;font-weight:bold;\">${a.pct_acierto}%</td>\n  </tr>`;\n};\n\n// Proyección texto\nconst projBox = proyeccion\n  ? `<div style=\"background:#f0f7ff;border:1px solid #c8e0f5;border-radius:4px;padding:16px 20px;font-size:13px;color:#444;line-height:1.7;\">${proyeccionTexto}</div>`\n  : `<div style=\"font-size:13px;color:#888;padding:16px;\">Insuficientes datos para proyección. Se necesitan al menos 2 días de actividad.</div>`;\n\nconst html = `<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head>\n<body style=\"margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#f5f5f5;\">\n<tr><td align=\"center\" style=\"padding:24px 16px;\">\n<table width=\"640\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:640px;\">\n\n<!-- HEADER -->\n<tr><td style=\"background:#E8444E;border-radius:8px 8px 0 0;padding:20px 24px;\">\n  <table width=\"100%\"><tr>\n    <td><img src=\"${logoUrl}\" height=\"32\" alt=\"NODO\" style=\"vertical-align:middle;margin-right:12px;filter:brightness(0) invert(1);\"><span style=\"color:white;font-size:18px;font-weight:bold;vertical-align:middle;\">CRACK TESOS 2026</span></td>\n    <td style=\"text-align:right;color:#FFFFFF;font-size:12px;\">Daily Analytics &nbsp;·&nbsp; ${fechaReporte}</td>\n  </tr></table>\n</td></tr>\n\n<!-- PRE-HEADER -->\n<tr><td style=\"font-size:12px;color:#555;padding:8px 0;\">\n  ✉ <strong>Crack Tesos 2026</strong> &nbsp;·&nbsp; Reporte diario — ${fechaCorta}\n</td></tr>\n\n<!-- ALERTA -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff8e6;border:1px solid #f0c040;border-radius:4px;\"><tr>\n    <td style=\"padding:12px 16px;font-size:13px;color:#7a5800;\">⚠️ ${alertaTrivia}</td>\n  </tr></table>\n</td></tr>\n\n<!-- KPIs -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\">\n    <tr><td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">✉ Actividad General — ${fechaCorta}</strong></td></tr>\n    <tr><td style=\"padding:16px;\">\n      <table width=\"100%\"><tr>\n        <td width=\"20%\" style=\"text-align:center;border-right:1px solid #eee;padding-bottom:8px;\">\n          <div style=\"font-size:28px;font-weight:300;color:#333;\">${kpis.total_usuarios}</div>\n          <div style=\"font-size:11px;color:#888;\">Participantes</div>\n        </td>\n        <td width=\"20%\" style=\"text-align:center;border-right:1px solid #eee;\">\n          <div style=\"font-size:28px;font-weight:300;color:#333;\">${kpis.agentes_activos||0}</div>\n          <div style=\"font-size:11px;color:#888;\">Agentes activos</div>\n        </td>\n        <td width=\"20%\" style=\"text-align:center;border-right:1px solid #eee;\">\n          <div style=\"font-size:28px;font-weight:300;color:#333;\">${kpis.total_respuestas}</div>\n          <div style=\"font-size:11px;color:#888;\">Respuestas</div>\n        </td>\n        <td width=\"20%\" style=\"text-align:center;border-right:1px solid #eee;\">\n          <div style=\"font-size:28px;font-weight:300;color:#333;\">${kpis.goles_totales}</div>\n          <div style=\"font-size:11px;color:#888;\">Goles ⚽</div>\n        </td>\n        <td width=\"20%\" style=\"text-align:center;\">\n          <div style=\"font-size:28px;font-weight:300;color:#333;\">${tasaAcierto}</div>\n          <div style=\"font-size:11px;color:#888;\">Tasa acierto</div>\n          <div style=\"font-size:11px;color:#1a73e8;\">${kpis.correctas}✅ ${kpis.incorrectas}❌</div>\n        </td>\n      </tr></table>\n    </td></tr>\n  </table>\n</td></tr>\n\n<!-- RANKING TOP 5 -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\">\n    <tr><td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">🏆 Ranking General — Top 5</strong></td></tr>\n    <tr><td style=\"padding:10px 16px 4px;font-size:12px;color:#555;line-height:1.6;border-bottom:1px solid #eee;\">${analisis.ranking||'—'}</td></tr>\n    <tr><td style=\"padding:0;\">\n      <table width=\"100%\">\n        <tr style=\"background:#f9f9f9;\"><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;width:30px;\">#</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;\">Participante</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;\">Agente</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Goles ⚽</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Correctas</td><td style=\"padding:8px 16px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Vel.</td></tr>\n        ${[0,1,2,3,4].map(i => rankRow(i+1, top5[i], i<2)).join('')}\n      </table>\n    </td></tr>\n  </table>\n</td></tr>\n\n<!-- TOP 5 AGENTES -->\n<tr><td style=\"padding-bottom:12px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\">\n    <tr><td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">🏢 Top 5 Agentes Comerciales</strong></td></tr>\n    <tr><td style=\"padding:10px 16px 4px;font-size:12px;color:#555;line-height:1.6;border-bottom:1px solid #eee;\">${analisis.agente||'—'}</td></tr>\n    <tr><td style=\"padding:0;\">\n      <table width=\"100%\">\n        <tr style=\"background:#f9f9f9;\"><td style=\"padding:6px 12px;font-size:11px;color:#888;font-weight:bold;\">Agente</td><td style=\"padding:6px 12px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Part.</td><td style=\"padding:6px 12px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Reg.</td><td style=\"padding:6px 12px;font-size:11px;color:#888;font-weight:bold;\">Goles</td><td style=\"padding:6px 12px;font-size:11px;color:#888;font-weight:bold;text-align:center;\">Acierto</td></tr>\n        ${[0,1,2,3,4].map(i => agentRow(i+1, agentsTop5[i])).join('')}\n      </table>\n    </td></tr>\n  </table>\n</td></tr>\n\n<!-- PROYECCIÓN -->\n<tr><td style=\"padding-bottom:24px;\">\n  <table width=\"100%\" style=\"background:#fff;border:1px solid #e0e0e0;border-radius:4px;\">\n    <tr><td style=\"padding:12px 16px;border-bottom:1px solid #eee;\"><strong style=\"font-size:12px;color:#444;\">💬 En palabras sencillas — Proyección de Participación</strong></td></tr>\n    <tr><td style=\"padding:20px 16px;\">${projBox}</td></tr>\n  </table>\n</td></tr>\n\n<!-- CTA -->\n<tr><td style=\"padding-bottom:20px;text-align:center;\">\n  <a href=\"${dashUrl}\" style=\"display:inline-block;background:#1a1a2e;color:white;padding:12px 32px;border-radius:6px;text-decoration:none;font-size:14px;font-weight:bold;\">📊 Ver Dashboard Completo →</a>\n</td></tr>\n\n<!-- FOOTER -->\n<tr><td style=\"text-align:center;padding:16px 0;border-top:1px solid #e0e0e0;\">\n  <img src=\"https://nodo.host/crack-tesos/images/favicon.png\" height=\"18\" alt=\"NODO\" style=\"opacity:0.4;vertical-align:middle;margin-right:6px;\">\n  <span style=\"font-size:11px;color:#aaa;\">Powered by <a href=\"https://www.nodo.live\" style=\"color:#aaa;\">NODO</a> · v1.6 · 2026</span><br>\n  <span style=\"font-size:11px;color:#aaa;\">Reporte automático · Crack Tesos 2026 · Bogotá, Colombia</span>\n</td></tr>\n\n</table></td></tr></table>\n</body></html>`;\n\nreturn [{json: {\n  html,\n  subject: `⚽ Crack Tesos 2026 · Analytics — ${ctx.fechaCorta}`,\n  fechaCorta: ctx.fechaCorta\n}}];\n"
       },
-      "id": "build-html",
+      "id": "5a67a831-54c1-4c13-96a6-f12f50362308",
       "name": "Construir Email HTML",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 620]
+      "position": [880, 320]
     },
     {
       "parameters": {
-        "operation": "createDraft",
         "sendTo": "jaime.chaves@nodo.live",
         "subject": "={{ $json.subject }}",
         "message": "={{ $json.html }}",
-        "options": {
-          "bodyContentType": "html",
-          "ccList": "",
-          "bccList": ""
-        }
+        "options": {}
       },
-      "id": "gmail-draft",
+      "id": "3916189f-5abb-48e9-add7-c3f029c16a32",
       "name": "Gmail — Crear Borrador",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [1340, 620],
-      "credentials": {"gmailOAuth2": {"id": "gmail-creds", "name": "Gmail account"}}
+      "position": [1104, 320],
+      "webhookId": "1a7d1990-0f4c-4c6d-bae1-dedfcbc4835e",
+      "credentials": {"gmailOAuth2": {"id": "MPFuKPfWjUdoz0Gt", "name": "Gmail account"}}
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "cronExpression", "expression": "0 0 14 * * *"}]
+        }
+      },
+      "id": "ae7866f1-b128-42e8-95a1-fd5944ef40dc",
+      "name": "Cron 7AM Bogotá (12:00 UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "notes": "14:00 UTC = 9:00 AM hora Bogotá (UTC-5) → ajusta si necesitas otra hora"
     }
   ],
   "connections": {
-    "Cron 12AM Bogotá (05:00 UTC)": {"main": [[{"node": "Query KPIs", "type": "main", "index": 0}]]},
-    "Query KPIs":         {"main": [[{"node": "Query Top 5", "type": "main", "index": 0}]]},
-    "Query Top 5":        {"main": [[{"node": "Query Agente Líder", "type": "main", "index": 0}]]},
-    "Query Agente Líder": {"main": [[{"node": "Query Diario", "type": "main", "index": 0}]]},
-    "Query Diario":       {"main": [[{"node": "Query Trivias", "type": "main", "index": 0}]]},
-    "Query Trivias":      {"main": [[{"node": "Preparar Contexto", "type": "main", "index": 0}]]},
-    "Preparar Contexto":  {"main": [[{"node": "Claude API — Análisis", "type": "main", "index": 0}]]},
-    "Claude API — Análisis": {"main": [[{"node": "Construir Email HTML", "type": "main", "index": 0}]]},
-    "Construir Email HTML":  {"main": [[{"node": "Gmail — Crear Borrador", "type": "main", "index": 0}]]}
+    "Cron 7AM Bogotá (12:00 UTC)": {"main": [[{"node": "Query KPIs", "type": "main", "index": 0}]]},
+    "Query KPIs":          {"main": [[{"node": "Query Top 5", "type": "main", "index": 0}]]},
+    "Query Top 5":         {"main": [[{"node": "Query Top 5 Agentes", "type": "main", "index": 0}]]},
+    "Query Top 5 Agentes": {"main": [[{"node": "Query Diario", "type": "main", "index": 0}]]},
+    "Query Diario":        {"main": [[{"node": "Query Trivias", "type": "main", "index": 0}]]},
+    "Query Trivias":       {"main": [[{"node": "Preparar Contexto", "type": "main", "index": 0}]]},
+    "Preparar Contexto":   {"main": [[{"node": "Claude API — Análisis", "type": "main", "index": 0}]]},
+    "Claude API — Análisis":  {"main": [[{"node": "Construir Email HTML", "type": "main", "index": 0}]]},
+    "Construir Email HTML":   {"main": [[{"node": "Gmail — Crear Borrador", "type": "main", "index": 0}]]}
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7893495d2138865bacf00c36cb31058fd32168c19f76991fd4f6d7ad4365b91d"
   },
   "settings": {"executionOrder": "v1"},
   "tags": [{"name": "crack-tesos"}, {"name": "email"}]
