@@ -58,12 +58,15 @@
     /* Top 3 Banner */
     .top3-banner{background:linear-gradient(135deg,#1a1a2e 0%,#2d1b3d 50%,#e63946 100%);border-radius:16px;padding:24px 28px;margin-bottom:24px;box-shadow:0 4px 20px rgba(230,57,70,.25);color:white}
     .top3-banner .t3-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px}
-    .top3-banner .t3-title{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+    .top3-banner .t3-title{font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .t3-subtitle{font-size:12px;font-weight:400;opacity:.7}
     .t3-chips{display:flex;gap:6px;flex-wrap:wrap}
     .t3-chip{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:white;font-size:12px;padding:5px 12px;border-radius:20px;cursor:pointer;transition:all .15s;white-space:nowrap}
     .t3-chip:hover{background:rgba(255,255,255,.22)}
     .t3-chip.active{background:white;color:#1a1a2e;border-color:white;font-weight:600}
     .t3-chip.all.active{background:#e63946;border-color:#e63946;color:white;font-weight:600}
+    .t3-chip.clear{background:transparent;border:1px dashed rgba(255,255,255,.4);opacity:.85}
+    .t3-chip.clear:hover{opacity:1;background:rgba(255,255,255,.12)}
     .t3-podium{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
     .t3-card{background:rgba(255,255,255,.1);border-radius:12px;padding:16px;backdrop-filter:blur(4px);position:relative;overflow:hidden}
     .t3-card.gold{border:2px solid #ffd700;background:rgba(255,215,0,.12)}
@@ -277,7 +280,7 @@ let state = {token: null, email: null, nombre: null, role: null, data: null};
 let charts = {};
 Chart.register(ChartDataLabels);
 Chart.defaults.set('plugins.datalabels', { display: false }); // opt-in por chart/dataset
-let top3State = { excludedAgents: new Set() };
+let top3State = { mode: 'all', selectedAgents: new Set() }; // mode: 'all' | 'filtered'
 
 // ========== AUTH ==========
 document.addEventListener('keydown', e => {
@@ -374,51 +377,73 @@ function renderAll() {
 // ========== TOP 3 BANNER ==========
 function renderTop3Banner() {
   const allRanking = filterRanking(state.data.ranking);
-  const pool = top3State.excludedAgents.size
-    ? allRanking.filter(r => !top3State.excludedAgents.has(r.agent_name))
-    : allRanking;
+  let pool, showInstruction = false;
+  if (top3State.mode === 'all') {
+    pool = allRanking;
+  } else if (top3State.selectedAgents.size === 0) {
+    pool = [];
+    showInstruction = true;
+  } else {
+    pool = allRanking.filter(r => top3State.selectedAgents.has(r.agent_name));
+  }
   const top3 = pool.slice(0, 3);
 
   const agents = [...new Set(allRanking.map(r => r.agent_name).filter(Boolean))].sort();
   const chipsHtml = agents.map(a => {
-    const active = !top3State.excludedAgents.has(a);
+    const active = top3State.mode === 'filtered' && top3State.selectedAgents.has(a);
     return `<span class="t3-chip${active ? ' active' : ''}" onclick="toggleAgentChip('${a.replace(/'/g,"\\'")}')">${a}</span>`;
   }).join('');
-  const allActive = top3State.excludedAgents.size === 0;
+  const allActive = top3State.mode === 'all';
+
+  let podiumHtml;
+  if (showInstruction) {
+    podiumHtml = '<div class="t3-empty">👆 Selecciona un agente o más para ver la comparación</div>';
+  } else if (!top3.length) {
+    podiumHtml = '<div class="t3-empty">No hay participantes para los agentes seleccionados.</div>';
+  } else {
+    podiumHtml = top3.map((r, i) => {
+      const medal = ['🥇','🥈','🥉'][i];
+      const cls = ['gold','silver','bronze'][i];
+      const next = top3[i+1];
+      const diff = next ? `+${Number(r.total_goals - next.total_goals).toLocaleString()} sobre el ${i+2}°` : '—';
+      return `<div class="t3-card ${cls}">
+        <div class="t3-medal">${medal}</div>
+        <div class="t3-name">${r.name}</div>
+        <div class="t3-agent">${r.agent_name || 'Sin agente'}</div>
+        <div class="t3-goals">${Number(r.total_goals).toLocaleString()} ⚽</div>
+        <div class="t3-diff">${diff}</div>
+      </div>`;
+    }).join('');
+  }
 
   document.getElementById('top3Banner').innerHTML = `
     <div class="t3-header">
-      <div class="t3-title">🏆 Top 3 General</div>
+      <div class="t3-title">🏆 Top 3 <span class="t3-subtitle">Selecciona un agente o más para ver la comparación</span></div>
       <div class="t3-chips">
         <span class="t3-chip all${allActive ? ' active' : ''}" onclick="resetAgentFilter()">Todos</span>
+        <span class="t3-chip clear" onclick="clearAgentSelection()">Limpiar</span>
         ${chipsHtml}
       </div>
     </div>
-    <div class="t3-podium">
-      ${top3.length ? top3.map((r, i) => {
-        const medal = ['🥇','🥈','🥉'][i];
-        const cls = ['gold','silver','bronze'][i];
-        const next = top3[i+1];
-        const diff = next ? `+${Number(r.total_goals - next.total_goals).toLocaleString()} sobre el ${i+2}°` : '—';
-        return `<div class="t3-card ${cls}">
-          <div class="t3-medal">${medal}</div>
-          <div class="t3-name">${r.name}</div>
-          <div class="t3-agent">${r.agent_name || 'Sin agente'}</div>
-          <div class="t3-goals">${Number(r.total_goals).toLocaleString()} ⚽</div>
-          <div class="t3-diff">${diff}</div>
-        </div>`;
-      }).join('') : '<div class="t3-empty">No hay participantes para los agentes seleccionados.</div>'}
-    </div>`;
+    <div class="t3-podium">${podiumHtml}</div>`;
 }
 
 function toggleAgentChip(agentName) {
-  if (top3State.excludedAgents.has(agentName)) top3State.excludedAgents.delete(agentName);
-  else top3State.excludedAgents.add(agentName);
+  top3State.mode = 'filtered';
+  if (top3State.selectedAgents.has(agentName)) top3State.selectedAgents.delete(agentName);
+  else top3State.selectedAgents.add(agentName);
   renderTop3Banner();
 }
 
 function resetAgentFilter() {
-  top3State.excludedAgents.clear();
+  top3State.mode = 'all';
+  top3State.selectedAgents.clear();
+  renderTop3Banner();
+}
+
+function clearAgentSelection() {
+  top3State.mode = 'filtered';
+  top3State.selectedAgents.clear();
   renderTop3Banner();
 }
 
@@ -433,6 +458,7 @@ function renderKPIs() {
   const goles_totales    = k.goles_totales    - (k.pruebas_goles||0);
   const tasa    = total_respuestas > 0 ? Math.round(correctas / total_respuestas * 100) : 0;
   const regRate = total_usuarios   > 0 ? Math.round(registrados / total_usuarios * 100) : 0;
+  const partRate = total_usuarios  > 0 ? Math.round(activos / total_usuarios * 100) : 0;
 
   const tr = state.data.trivias || [];
   const codigosTotales = tr.reduce((s,t) => s + (parseInt(t.codigos_registrados)||0), 0);
@@ -444,17 +470,17 @@ function renderKPIs() {
   document.getElementById('kpiGridEngagement').innerHTML = `
     <div class="kpi blue"><div class="val">${total_usuarios}</div><div class="lbl">Participantes en base</div></div>
     <div class="kpi green"><div class="val">${registrados}</div><div class="lbl">Registrados</div><div class="sub">${regRate}% de la base</div></div>
-    <div class="kpi"><div class="val">${activos}</div><div class="lbl">Han participado</div></div>
+    <div class="kpi"><div class="val">${activos}</div><div class="lbl">Han participado</div><div class="sub">${partRate}% de la base</div></div>
   `;
 
   document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi blue"><div class="val">${Number(codigosTotales).toLocaleString()}</div><div class="lbl">Códigos totales registrados</div></div>
+    <div class="kpi"><div class="val">${promCodigosPorTriviaMult}</div><div class="lbl">Prom. códigos por trivia c/multiplicador</div></div>
     <div class="kpi"><div class="val">${total_respuestas}</div><div class="lbl">Respuestas totales</div></div>
     <div class="kpi green"><div class="val">${tasa}%</div><div class="lbl">Tasa de acierto</div><div class="sub">${correctas} correctas</div></div>
     <div class="kpi red"><div class="val">${Number(goles_totales).toLocaleString()}</div><div class="lbl">Goles acumulados ⚽</div></div>
     <div class="kpi"><div class="val">${k.trivias_enviadas}</div><div class="lbl">Trivias enviadas</div><div class="sub">${k.trivias_con_multiplicador} con multiplicador</div></div>
-    <div class="kpi blue"><div class="val">${Number(codigosTotales).toLocaleString()}</div><div class="lbl">Códigos totales registrados</div></div>
     <div class="kpi green"><div class="val">${golesPorCodigo}</div><div class="lbl">Goles por código</div><div class="sub">multiplicador / código</div></div>
-    <div class="kpi"><div class="val">${promCodigosPorTriviaMult}</div><div class="lbl">Prom. códigos por trivia c/multiplicador</div></div>
   `;
 }
 
