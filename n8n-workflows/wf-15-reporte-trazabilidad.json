@@ -42,7 +42,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_agg(t ORDER BY t.participante, t.trivia_number, t.fecha) AS data FROM (SELECT u.name AS participante, u.document_id AS cedula, u.agent_name AS agente, l.trivia_number, l.movement_type AS tipo_movimiento, l.amount AS goles, CASE WHEN l.movement_type='multiplier_bonus' THEN (regexp_match(l.description, 'por (\\d+) códigos'))[1]::int ELSE NULL END AS codigos_cargados, l.description AS descripcion, l.created_at AT TIME ZONE 'America/Bogota' AS fecha FROM ct_scoring_ledger l JOIN ct_users u ON l.user_id = u.user_id WHERE u.agent_name IS NULL OR u.agent_name != 'PRUEBAS') t",
+        "query": "SELECT json_agg(t ORDER BY t.participante, t.trivia_number, t.fecha) AS data FROM (SELECT u.name AS participante, u.document_id AS cedula, u.agent_name AS agente, u.status AS estado, l.trivia_number, l.movement_type AS tipo_movimiento, l.amount AS goles, CASE WHEN l.movement_type='multiplier_bonus' THEN (regexp_match(l.description, 'por (\\d+) códigos'))[1]::int ELSE NULL END AS codigos_cargados, l.description AS descripcion, l.created_at AT TIME ZONE 'America/Bogota' AS fecha FROM ct_scoring_ledger l JOIN ct_users u ON l.user_id = u.user_id WHERE u.agent_name IS NULL OR u.agent_name != 'PRUEBAS') t",
         "options": {}
       },
       "id": "q-detalle",
@@ -55,7 +55,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT json_agg(t ORDER BY t.total_calculado DESC) AS data FROM (SELECT u.name AS participante, u.document_id AS cedula, u.agent_name AS agente, COALESCE(SUM(CASE WHEN l.movement_type='trivia_base' THEN l.amount END),0) AS goles_base, COALESCE(SUM(CASE WHEN l.movement_type='speed_bonus' THEN l.amount END),0) AS goles_velocidad, COALESCE(SUM(CASE WHEN l.movement_type='multiplier_bonus' THEN l.amount END),0) AS goles_multiplicador, COALESCE(SUM(CASE WHEN l.movement_type='multiplier_bonus' THEN (regexp_match(l.description,'por (\\d+) códigos'))[1]::int END),0) AS codigos_totales, COALESCE(SUM(CASE WHEN l.movement_type='adjustment' THEN l.amount END),0) AS ajustes, COALESCE(SUM(l.amount),0) AS total_calculado, u.total_goals AS total_sistema, COALESCE(SUM(l.amount),0) - u.total_goals AS diferencia FROM ct_users u LEFT JOIN ct_scoring_ledger l ON u.user_id = l.user_id WHERE u.agent_name IS NULL OR u.agent_name != 'PRUEBAS' GROUP BY u.user_id, u.name, u.document_id, u.agent_name, u.total_goals) t",
+        "query": "SELECT json_agg(t ORDER BY t.total_calculado DESC) AS data FROM (SELECT u.name AS participante, u.document_id AS cedula, u.agent_name AS agente, u.status AS estado, COALESCE(SUM(CASE WHEN l.movement_type='trivia_base' THEN l.amount END),0) AS goles_base, COALESCE(SUM(CASE WHEN l.movement_type='speed_bonus' THEN l.amount END),0) AS goles_velocidad, COALESCE(SUM(CASE WHEN l.movement_type='multiplier_bonus' THEN l.amount END),0) AS goles_multiplicador, COALESCE(SUM(CASE WHEN l.movement_type='multiplier_bonus' THEN (regexp_match(l.description,'por (\\d+) códigos'))[1]::int END),0) AS codigos_totales, COALESCE(SUM(CASE WHEN l.movement_type='adjustment' THEN l.amount END),0) AS ajustes, COALESCE(SUM(l.amount),0) AS total_calculado, u.total_goals AS total_sistema, COALESCE(SUM(l.amount),0) - u.total_goals AS diferencia FROM ct_users u LEFT JOIN ct_scoring_ledger l ON u.user_id = l.user_id WHERE u.agent_name IS NULL OR u.agent_name != 'PRUEBAS' GROUP BY u.user_id, u.name, u.document_id, u.agent_name, u.status, u.total_goals) t",
         "options": {}
       },
       "id": "q-resumen",
@@ -67,7 +67,20 @@
     },
     {
       "parameters": {
-        "jsCode": "function parseData(nodeName) {\n  const raw = $(nodeName).first().json.data;\n  return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []);\n}\n\nconst detalle = parseData('Query Detalle');\nconst resumen = parseData('Query Resumen');\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  detalle,\n  resumen\n}}];"
+        "operation": "executeQuery",
+        "query": "SELECT json_agg(t) AS data FROM (SELECT 'Todos los participantes (activos + inactivos)' AS concepto, COALESCE(SUM(total_goals),0) AS goles FROM ct_users WHERE agent_name IS NULL OR agent_name != 'PRUEBAS' UNION ALL SELECT 'Solo participantes activos (debe coincidir con KPI Goles Acumulados del Dashboard)' AS concepto, COALESCE(SUM(total_goals),0) AS goles FROM ct_users WHERE status='active' AND (agent_name IS NULL OR agent_name != 'PRUEBAS') UNION ALL SELECT 'Solo participantes inactivos (historial conservado, no se muestra en el Dashboard)' AS concepto, COALESCE(SUM(total_goals),0) AS goles FROM ct_users WHERE status='inactive' AND (agent_name IS NULL OR agent_name != 'PRUEBAS')) t",
+        "options": {}
+      },
+      "id": "q-totales",
+      "name": "Query Totales",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [900, 600],
+      "credentials": {"postgres": {"id": "supabase-creds", "name": "Supabase DB"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "function parseData(nodeName) {\n  const raw = $(nodeName).first().json.data;\n  return Array.isArray(raw) ? raw : (raw ? JSON.parse(raw) : []);\n}\n\nconst detalle = parseData('Query Detalle');\nconst resumen = parseData('Query Resumen');\nconst totales = parseData('Query Totales');\n\nreturn [{json: {\n  ok: true,\n  generated_at: new Date().toLocaleString('es-CO', {timeZone: 'America/Bogota'}),\n  detalle,\n  resumen,\n  totales\n}}];"
       },
       "id": "build",
       "name": "Construir Respuesta",
@@ -109,7 +122,8 @@
       ]
     },
     "Query Detalle": {"main": [[{"node": "Query Resumen", "type": "main", "index": 0}]]},
-    "Query Resumen": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
+    "Query Resumen": {"main": [[{"node": "Query Totales", "type": "main", "index": 0}]]},
+    "Query Totales": {"main": [[{"node": "Construir Respuesta", "type": "main", "index": 0}]]},
     "Construir Respuesta": {"main": [[{"node": "Responder", "type": "main", "index": 0}]]}
   },
   "settings": {"executionOrder": "v1"},

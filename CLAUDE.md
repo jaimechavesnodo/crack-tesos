@@ -79,6 +79,8 @@ Flujo real:
 
 **Usuarios inactivados**: `status='inactive'` se asigna por `document_id` (no por `phone`, que puede cambiar). El historial de respuestas/goles NUNCA se borra ni se descuenta — sigue contando en acumulados. Aparecen automáticamente en el tab "Desactivados" del dashboard (WF-13 filtra `WHERE status='inactive'`).
 
+**KPI "Goles acumulados" incluye activos E inactivos**: a propósito, `goles_totales` en WF-13 y WF-14 NO filtra por `status` — solo excluye `agent_name='PRUEBAS'`. Es el total histórico real de goles entregados durante el evento, consistente con el informe de trazabilidad (WF-15). Los demás KPIs de conteo (`total_usuarios`, `registrados`, `activos`) sí siguen filtrando `status='active'`, porque describen la base de participantes vigente, no el histórico de goles. No reintroducir `AND status='active'` en `goles_totales`/`pruebas_goles` sin confirmar con Jaime — ya se corrigió una vez por inconsistencia entre el dashboard y el informe de trazabilidad.
+
 **Primera respuesta cuenta**: duplicados se marcan `is_duplicate=true` pero no se eliminan ni puntúan.
 
 **Ventana 24h**: fuera de rango → `is_out_of_time=true`, 0 goles, pero se registra.
@@ -91,6 +93,26 @@ Flujo real:
 - **`json_agg` en WF-13**: cada query se envuelve en `SELECT json_agg(t) FROM (...) t` para que el nodo Postgres devuelva 1 fila con un array, evitando que n8n multiplique items entre nodos en cadena.
 - **Email (WF-14) vs Dashboard (WF-13) mostrarán números levemente distintos** si se comparan en momentos diferentes del día — ambos usan el mismo algoritmo de regresión lineal, pero el email es un snapshot de las 7AM y el dashboard es en vivo. No es un bug.
 - **Extraer datos embebidos en `description` con `regexp_match`**: en vez de agregar columnas nuevas al esquema para datos ya descriptivos en texto (ej. cantidad de códigos en `ct_scoring_ledger.description`, formato `'+200 goles por 15 códigos — Trivia #18'`), usar `(regexp_match(description, 'por (\d+) códigos'))[1]::int` directamente en el SELECT (ver WF-15).
+- **Nodo HTTP Request con credential genérico (Header Auth)**: en el campo "Authentication" del nodo, hay que elegir **"Generic Credential Type"**, NO "Predefined Credential Type" (ese es solo para integraciones predefinidas como OpenAI/Slack y no sirve para un header custom). Tras elegir "Generic Credential Type" aparece "Generic Auth Type" → elegir "Header Auth" → ahí sí aparece el dropdown para seleccionar/crear el credential real. Si al reimportar un workflow el campo "Credential Type" sale vacío en rojo, es porque quedó en modo "Predefined" — cambiarlo manualmente (ver caso WF-14 / Claude API).
+- **Reimportar un workflow en n8n puede dejarlo INACTIVO** aunque antes estuviera activo. Siempre revisar el toggle de activación después de reimportar, antes de asumir que el webhook ya responde.
+- **`MAX()` tras una subquery agregada, no `SUM()` directo**: si necesitas traer un valor ya agregado por una tabla 1-a-muchos (ej. códigos registrados desde `ct_scoring_ledger`, varias filas por trivia) hacia una query que ya tiene OTRO `LEFT JOIN` 1-a-muchos (ej. `ct_trivia_responses`), primero agrega esa tabla en una subquery `GROUP BY` aparte (1 fila por trivia), y al traerla al SELECT final usa `MAX()` (no `SUM()`) — el valor se repite idéntico en cada fila del join externo, así que `SUM` lo multiplicaría por la cantidad de respuestas. Ver "Query Trivias" en WF-13.
+
+## Dashboard — `state.data.trivias` (campos extendidos, WF-13 "Query Trivias")
+
+Además de `trivia_number/respuestas/correctas/fuera_tiempo/avg_segundos`, cada item incluye: `has_multiplier` (bool), `question`, `option_a/b/c`, `correct_option` ('A'|'B'|'C'), `goles_sin_multiplicador` (SUM base_goals+speed_bonus), `goles_multiplicador` (SUM multiplier_bonus), `codigos_registrados` (extraído de `ct_scoring_ledger.description` vía regexp, 0 si la trivia no tuvo multiplicador). Usado por: banner Top3 (no depende de esto, usa `ranking`), KPIs de códigos/goles-por-código, gráfico "Impacto de Multiplicadores", tarjetas de pregunta en tab Participación.
+
+## Checklist operativo — antes de enviar una trivia
+
+1. Confirmar que el workflow relevante (WF-03/04/06/07, y si se tocó algo, WF-13/14/15) esté **activo** en n8n tras cualquier reimportación
+2. Si se modificó WF-14, probar el nodo "Claude API — Análisis" con "Execute step" manualmente antes de depender del cron de las 7AM
+3. Refrescar `dashboard.html` y confirmar que los KPIs (especialmente "Goles acumulados") muestran el número esperado
+4. Crear/confirmar la trivia del día: `trivia_number` consecutivo, pregunta + 3 opciones + `correct_option`, shuffle de A/B/C aplicado
+5. Definir `has_multiplier` si esta trivia llevará carga de códigos después
+6. Definir `sent_at` (hora de envío); `closes_at` se calcula como `sent_at + 24h`
+7. Confirmar que WF-07 (cierre automático 24h) está activo para que la trivia anterior cierre sola si corresponde
+8. Probar la trivia end-to-end con un número de cuenta `agent_name='PRUEBAS'` antes del envío masivo (valida WF-03 + WF-04 con la pregunta real del día)
+9. Enviar el broadcast desde WATI a la audiencia (excluir PRUEBAS e inactivos) — **mecanismo exacto de envío del broadcast aún no documentado, confirmar con Jaime y agregar aquí cuando se confirme**
+10. Tras el envío, monitorear el tab "Participación" del dashboard para confirmar que llegan respuestas
 
 ## Operaciones manuales de datos
 
