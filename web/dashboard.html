@@ -459,6 +459,8 @@ function renderKPIs() {
   const tasa    = total_respuestas > 0 ? Math.round(correctas / total_respuestas * 100) : 0;
   const regRate = total_usuarios   > 0 ? Math.round(registrados / total_usuarios * 100) : 0;
   const partRate = total_usuarios  > 0 ? Math.round(activos / total_usuarios * 100) : 0;
+  const participantesCodigos = k.participantes_codigos || 0;
+  const codigosRate = total_usuarios > 0 ? Math.round(participantesCodigos / total_usuarios * 100) : 0;
 
   const tr = state.data.trivias || [];
   const codigosTotales = tr.reduce((s,t) => s + (parseInt(t.codigos_registrados)||0), 0);
@@ -471,6 +473,7 @@ function renderKPIs() {
     <div class="kpi blue"><div class="val">${total_usuarios}</div><div class="lbl">Participantes en base</div></div>
     <div class="kpi green"><div class="val">${registrados}</div><div class="lbl">Registrados</div><div class="sub">${regRate}% de la base</div></div>
     <div class="kpi"><div class="val">${activos}</div><div class="lbl">Han participado</div><div class="sub">${partRate}% de la base</div></div>
+    <div class="kpi blue"><div class="val">${participantesCodigos}</div><div class="lbl">Participantes que han enviado códigos</div><div class="sub">${codigosRate}% de la base</div></div>
   `;
 
   document.getElementById('kpiGrid').innerHTML = `
